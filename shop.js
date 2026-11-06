@@ -89,12 +89,15 @@
     return null;
   }
   const partUrl = (part, vehicle) => search((vehicle ? vehicle + ' ' : '') + part);
+  // How to say the part in a sentence (the keyword above is tuned for Amazon search)
+  const LABEL = { 'ignition coil spark plugs': 'spark plugs and ignition coils', 'car battery': 'battery', 'AC pressure switch': 'A/C pressure switch' };
+  const partLabel = part => LABEL[part] || part;
 
   const ACCESSORY = { tires: 'leveling kit', led: 'LED headlight bulbs', battery: 'car battery', aux: 'LED light bar',
     intake: 'cold air intake', exhaust: 'cat-back exhaust', tuner: 'performance tuner programmer', tow: 'trailer brake controller',
     remote: 'remote start', dashcam: 'hardwire dash cam', stereo: 'Apple CarPlay stereo', aero: 'roof rack', cluster: 'digital gauge cluster', hud: 'head up display' };
   const accessoryUrl = (id, vehicle) => ACCESSORY[id] ? search((vehicle ? vehicle + ' ' : '') + ACCESSORY[id]) : null;
 
-  const api = { TAG, DISCLOSURE, SCANNERS, partFor, partUrl, accessoryUrl, search };
+  const api = { TAG, DISCLOSURE, SCANNERS, partFor, partUrl, partLabel, accessoryUrl, search };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SHOP = api;
 })(typeof window !== 'undefined' ? window : globalThis);

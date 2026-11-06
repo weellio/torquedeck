@@ -441,7 +441,7 @@
       $('#dtcList').innerHTML = all.length ? all.map(([c, k]) => {
         const desc = OBD.dtcDescription(c), part = SHOP.partFor(c, desc); if (part) shopped = true;
         return `<div class="dtc"><div class="code">${c}</div><div class="grow"><div><span class="tag ${k}">${k}</span></div>
-        <div style="margin:5px 0 4px">${esc(desc)}</div><div class="dlinks"><a target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(c + ' ' + make() + ' causes fix')}">Search causes &amp; fixes ↗</a>${part ? `<a target="_blank" rel="noopener sponsored" href="${SHOP.partUrl(part, make())}">Shop ${esc(part)} ↗</a>` : ''}</div></div></div>`;
+        <div style="margin:5px 0 4px">${esc(desc)}</div><div class="dlinks">${OBD.DTC_DB[c] ? `<a target="_blank" rel="noopener" href="codes/${c.toLowerCase()}.html">What it means ↗</a>` : ''}<a target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(c + ' ' + make() + ' causes fix')}">Search causes &amp; fixes ↗</a>${part ? `<a target="_blank" rel="noopener sponsored" href="${SHOP.partUrl(part, make())}">Shop ${esc(SHOP.partLabel(part))} ↗</a>` : ''}</div></div></div>`;
       }).join('') + (shopped ? `<div class="small muted" style="padding:10px 2px 0">${SHOP.DISCLOSURE}</div>` : '')
         : '<div class="empty" style="color:var(--ok)">✓ No trouble codes stored or pending.</div>';
       renderCombined([...new Set(all.map(x => x[0]))]);
@@ -1575,7 +1575,8 @@
       ['OSRM', 'Free routing for in-app Directions (no key). Community demo server — please use it lightly.', 'https://project-osrm.org', null],
       ['TomTom (optional)', 'If you add your own key: live traffic, traffic-aware routing and address search.', 'https://developer.tomtom.com', null],
       ['NHTSA vPIC', 'Free US VIN decoding (make, model, year, engine).', 'https://vpic.nhtsa.dot.gov', null],
-      ['Torque Deck', 'Free and open-source (MIT). Report a bug, suggest a feature or host your own copy.', 'https://github.com/weellio/torquedeck', null]
+      ['Torque Deck', 'Free and open-source (MIT). Report a bug, suggest a feature or host your own copy.', 'https://github.com/weellio/torquedeck', null],
+      ['Trouble code guide', 'What common check engine codes mean, what causes them and whether it is safe to drive.', 'https://obdii.bworldtools.com/codes/', null]
     ];
     sheet(`<h3>Open-source credits</h3><p class="small muted" style="line-height:1.5">This app stands on free, open tools and data. Thank you to everyone who builds and hosts them.</p>
       ${C.map(([n, d, u, donate]) => `<div class="hsec"><b>${esc(n)}</b><p>${esc(d)}</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">${u ? `<a href="${u}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, ''))} ↗</a>` : ''}${donate ? `<a class="hdonate" href="${u}" target="_blank" rel="noopener">♥ ${esc(donate)} ↗</a>` : ''}</div></div>`).join('')}
@@ -1592,7 +1593,8 @@
   }
   applyTheme(S.theme || 'torque'); injectExtras(); initSettings(); buildGauge(); renderTiles(); compatNote(); updateChips();
   updateReconnectUI(); renderAdapter();
-  if (autoOn() && S.lastConn) reconnect(false);
+  if (location.hash === '#demo') { history.replaceState(null, '', location.pathname); connect('demo'); }
+  else if (autoOn() && S.lastConn) reconnect(false);
   requestAnimationFrame(frame);
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
   window.__td = { connect, data, report };

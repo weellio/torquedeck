@@ -1,4 +1,6 @@
 # Rename to ".htaccess" and upload alongside index.html (Apache hosts).
+# "/" shows the landing page; the app stays at /index.html (installed apps open that directly)
+DirectoryIndex home.html index.html
 RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

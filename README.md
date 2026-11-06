@@ -4,8 +4,10 @@ Torque Deck turns a cheap Bluetooth ELM327 adapter and your phone into a car das
 code reader. It is a web app you install from the browser. It has no app store, no account,
 no ads and no backend.
 
-**Use it now:** https://obdii.bworldtools.com
+**Use it now:** https://obdii.bworldtools.com/index.html
 (open it in Chrome on Android, then ⋮ → **Install app**).
+The site's front page is a short tour, and there is a [trouble code guide](https://obdii.bworldtools.com/codes/)
+with a page for each of 169 common check engine codes.
 No adapter? Tap **Try demo car** to try every screen with a simulated car.
 
 ## What it does
@@ -74,6 +76,8 @@ branch → `main` / root. Then open `https://<you>.github.io/torquedeck/` on you
 Cloudflare Pages, Netlify, or a folder on your own domain work too.
 
 On every deploy, bump the `CACHE` version in `sw.js` so phones pick up the new build.
+On Apache, `dot-htaccess.txt` (renamed `.htaccess`) makes `/` show the landing page. Without it,
+`/` opens the app directly, which is fine too.
 
 ## Files
 | File | What it is |
@@ -84,6 +88,8 @@ On every deploy, bump the `CACHE` version in `sw.js` so phones pick up the new b
 | `mods.js` | Vehicle and accessory guide data |
 | `shop.js` | Adapter picks, trouble-code to part mapping, Amazon links (Associates tag) |
 | `sw.js` | Offline cache for the app files only (never intercepts map tiles) |
+| `home.html`, `codes/`, `sitemap.xml`, `robots.txt` | Landing page and trouble-code pages. **Generated**: edit `tools/build_pages.js` / `tools/code_content.js`, then run `node tools/build_pages.js` |
+| `site.css`, `img/` | Styles and screenshots for the landing and code pages |
 | `maplibre-gl.js/.css` | Bundled MapLibre GL JS v4.7.1 (BSD-3) |
 | `manifest.json`, icons | Install as an app |
 | `dot-htaccess.txt` | Optional Apache config (HTTPS redirect + headers). Rename to `.htaccess` |

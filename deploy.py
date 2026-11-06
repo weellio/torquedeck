@@ -13,6 +13,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FILES = ['index.html', 'app.js', 'obd.js', 'mods.js', 'shop.js', 'sw.js', 'manifest.json',
          'maplibre-gl.js', 'maplibre-gl.css', 'icon-192.png', 'icon-512.png']
 HTACCESS = ('dot-htaccess.txt', '.htaccess')
+# landing page + SEO pages (built by: node tools/build_pages.js)
+SITE_FILES = ['home.html', 'site.css', 'sitemap.xml', 'robots.txt']
+SITE_DIRS = ['img', 'codes']
 
 
 def env():
@@ -69,6 +72,20 @@ def main():
         with open(os.path.join(HERE, name), 'rb') as f:
             ftp.storbinary('STOR ' + name, f)
         print('  uploaded', name)
+    for name in SITE_FILES:
+        with open(os.path.join(HERE, name), 'rb') as f:
+            ftp.storbinary('STOR ' + name, f)
+        print('  uploaded', name)
+    for d in SITE_DIRS:
+        try:
+            ftp.mkd(d)
+        except ftplib.error_perm:
+            pass                                   # already there
+        names = sorted(os.listdir(os.path.join(HERE, d)))
+        for name in names:
+            with open(os.path.join(HERE, d, name), 'rb') as f:
+                ftp.storbinary(f'STOR {d}/{name}', f)
+        print(f'  uploaded {d}/ ({len(names)} files)')
     src, dst = HTACCESS
     with open(os.path.join(HERE, src), 'rb') as f:
         ftp.storbinary('STOR ' + dst, f)
