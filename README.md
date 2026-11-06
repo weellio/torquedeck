@@ -4,7 +4,7 @@ Torque Deck turns a cheap Bluetooth ELM327 adapter and your phone into a car das
 code reader. It is a web app you install from the browser. It has no app store, no account,
 no ads and no backend.
 
-**Use it now:** https://odbii.bworldtools.com
+**Use it now:** https://obdii.bworldtools.com
 (open it in Chrome on Android, then ⋮ → **Install app**).
 No adapter? Tap **Try demo car** to try every screen with a simulated car.
 

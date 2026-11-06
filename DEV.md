@@ -9,7 +9,7 @@
 3. Engine unit tests (Node, no browser needed):
    node -e "const O=require('./obd.js'); console.log(O.decodePid('0C','410C1AF8'), O.decodeVin('1HGLM58718LA00000'))"
 
-4. Deploy to odbii.bworldtools.com:
+4. Deploy to obdii.bworldtools.com:
    python deploy.py          # bumps the sw.js cache version, uploads over FTPS (.env creds)
    python deploy.py --list   # read-only: show what is on the server
    Then hard-refresh on the phone.

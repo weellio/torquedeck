@@ -1,6 +1,6 @@
-"""Deploy Torque Deck to odbii.bworldtools.com over FTPS.
+"""Deploy Torque Deck to obdii.bworldtools.com over FTPS.
 
-Reads torquedeck_FTP_ID / torquedeck_FTP_PASSWORD (and optional torquedeck_FTP_HOST) from .env.
+Reads torquedeck_FTP_ID / torquedeck_FTP_PASSWORD (and torquedeck_FTP = the FTP host) from .env.
 The FTP account is jailed: the login directory IS the site's web root, so we never cwd
 to the absolute torquedeck_FTP_ROOT path (on these hosts it can point at a stale folder).
 
@@ -27,7 +27,7 @@ def env():
 
 
 def connect(cfg):
-    host = cfg.get('torquedeck_FTP_HOST') or 'ftp.odbii.bworldtools.com'
+    host = cfg.get('torquedeck_FTP') or cfg.get('torquedeck_FTP_HOST') or 'ftp.obdii.bworldtools.com'
     try:
         import certifi
         ctx = ssl.create_default_context(cafile=certifi.where())
@@ -74,7 +74,7 @@ def main():
         ftp.storbinary('STOR ' + dst, f)
     print('  uploaded', dst)
     ftp.quit()
-    print('done: https://odbii.bworldtools.com  (hard-refresh on the phone)')
+    print('done: https://obdii.bworldtools.com  (hard-refresh on the phone)')
 
 
 if __name__ == '__main__':

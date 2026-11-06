@@ -1,7 +1,7 @@
 # Torque Deck — project guide for Claude Code
 
 Installable OBD-II diagnostic **PWA** for Bluetooth ELM327 adapters. Plain HTML/CSS/JS,
-**no build step, no framework, no bundler**. Hosted at https://odbii.bworldtools.com (spelled odbii; obdii does not resolve).
+**no build step, no framework, no bundler**. Hosted at https://obdii.bworldtools.com.
 Public repo: https://github.com/weellio/torquedeck (MIT) — never commit `.env`.
 Keep it dependency-free and vanilla — do not introduce React/Vite/TypeScript/webpack.
 
@@ -64,7 +64,7 @@ Keep it dependency-free and vanilla — do not introduce React/Vite/TypeScript/w
 - Never add features to defeat **emissions or safety** systems. "My codes" stores only
   user-supplied, user-verified commands.
 
-## Deploy (odbii.bworldtools.com, Hostinger)
+## Deploy (obdii.bworldtools.com, Hostinger)
 `python deploy.py` bumps the sw.js cache version and uploads the app files + `.htaccess` over
 FTPS (creds in `.env`, which is gitignored). `python deploy.py --list` is read-only. The FTP login
 dir IS the web root; never cwd to `torquedeck_FTP_ROOT`. Hostinger presents a `*.hstgr.io`
