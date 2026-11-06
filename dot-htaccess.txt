@@ -1,0 +1,18 @@
+# Rename to ".htaccess" and upload alongside index.html (Apache hosts).
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  <FilesMatch "sw\.js$">
+    Header set Cache-Control "no-cache, max-age=0"
+  </FilesMatch>
+</IfModule>
+Options -Indexes
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+  AddType application/javascript .js
+</IfModule>

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Torque Deck — OBD-II</title>
+<link rel="stylesheet" href="maplibre-gl.css">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Orbitron:wght@500;700&family=Share+Tech+Mono&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d10; --panel:#13171c; --panel2:#1a1f26; --line:#252c35; --text:#e8edf2; --dim:#8a96a3; --faint:#55606c;
+  --accent:#ff6a1a; --accent2:#ffb020; --ok:#2fd27a; --warn:#ffb020; --bad:#ff4d4d; --blue:#3fa9ff;
+  --num:'Rajdhani',system-ui,sans-serif; --ui:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --onaccent:#140800; --termbg:#06080a; --dbg:#000; --dcard:#0c0f13;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--ui);font-size:15px}
+body{display:flex;flex-direction:column;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 14px;cursor:pointer}
+button:active{transform:scale(.97)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--onaccent);font-weight:600}
+button.danger{background:transparent;border-color:var(--bad);color:var(--bad)}
+button.ghost{background:transparent}
+button:disabled{opacity:.4;pointer-events:none}
+select,input{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+
+/* header */
+header{padding:calc(var(--safe-t) + 10px) 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:linear-gradient(var(--panel),var(--bg))}
+.brand{font-family:var(--num);font-weight:700;font-size:21px;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.brand i{width:10px;height:10px;border-radius:50%;background:var(--faint);display:inline-block;box-shadow:0 0 0 3px #ffffff08}
+.brand i.on{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.brand i.busy{background:var(--warn);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.conninfo{flex:1;min-width:0;font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#connBtn{padding:8px 14px}
+
+main{flex:1;overflow-y:auto;padding:14px 14px calc(84px + var(--safe-b))}
+.view{display:none}.view.active{display:block}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(6px + var(--safe-b))}
+nav button{flex:1;background:none;border:0;border-radius:10px;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--dim)}
+nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+nav button.active{color:var(--accent)}
+nav .badge{position:absolute;margin-left:18px;margin-top:-2px;background:var(--bad);color:#fff;font-size:10px;border-radius:9px;padding:0 5px;min-width:16px}
+
+h2{font-family:var(--num);font-size:19px;letter-spacing:.4px;margin:18px 2px 10px;font-weight:700;text-transform:uppercase;color:var(--dim)}
+h2:first-child{margin-top:4px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
+.row{display:flex;gap:10px;align-items:center}
+.row.wrap{flex-wrap:wrap}
+.grow{flex:1}
+.muted{color:var(--dim)} .small{font-size:12.5px}
+.empty{padding:28px 10px;text-align:center;color:var(--dim)}
+
+/* hero gauge */
+.hero{position:relative;background:radial-gradient(120% 90% at 50% 100%,color-mix(in srgb,var(--accent) 8%,var(--panel)) 0%,var(--panel) 60%);border:1px solid var(--line);border-radius:20px;padding:6px 10px 14px;overflow:hidden}
+.hero svg{width:100%;display:block}
+.hero .center{position:absolute;left:0;right:0;top:40%;text-align:center;pointer-events:none}
+.hero .spd{font-family:var(--num);font-weight:700;font-size:78px;line-height:.9;font-variant-numeric:tabular-nums}
+.hero .spdu{color:var(--dim);font-size:13px;letter-spacing:2px;text-transform:uppercase}
+.hero .rpmtxt{font-family:var(--num);font-size:22px;color:var(--accent2);margin-top:6px;font-variant-numeric:tabular-nums}
+.hero .rpmtxt small{color:var(--dim);font-size:12px;letter-spacing:1.5px}
+.hero .milchip{position:absolute;top:12px;left:12px;font-size:11px;font-weight:600;padding:4px 8px;border-radius:8px;background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad);display:none}
+.hero .rate{position:absolute;top:12px;right:14px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:900px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 12px 8px;min-height:112px;overflow:hidden;cursor:pointer}
+.tile .lbl{font-size:12px;color:var(--dim);display:flex;justify-content:space-between;gap:6px}
+.tile .lbl span:last-child{color:var(--faint)}
+.tile .val{font-family:var(--num);font-size:38px;font-weight:700;line-height:1.05;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .val small{font-size:14px;color:var(--dim);font-weight:500;margin-left:3px}
+.tile .bar{height:4px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}
+.tile .bar b{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .25s}
+.tile canvas{position:absolute;left:0;right:0;bottom:0;width:100%;height:44px;opacity:.45;pointer-events:none}
+.tile .mm{font-size:10.5px;color:var(--faint);margin-top:5px;font-variant-numeric:tabular-nums;position:relative}
+.tile.unsup .val{color:var(--faint)}
+.tile.addtile{display:flex;align-items:center;justify-content:center;border-style:dashed;color:var(--dim);font-size:13px}
+
+/* codes */
+.mil{display:flex;align-items:center;gap:14px}
+.mil .lamp{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:var(--panel2)}
+.mil .lamp svg{width:28px;height:28px;fill:var(--faint)}
+.mil.on .lamp{background:color-mix(in srgb,var(--warn) 14%,transparent)}.mil.on .lamp svg{fill:var(--warn);filter:drop-shadow(0 0 6px var(--warn))}
+.dtc{display:flex;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line)}
+.dtc:last-child{border:0}
+.dtc .code{font-family:var(--num);font-weight:700;font-size:22px;min-width:74px}
+.dtc .tag{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px}
+.tag.stored{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}.tag.pending{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}.tag.permanent{background:color-mix(in srgb,var(--blue) 14%,transparent);color:var(--blue)}
+.dtc a{color:var(--blue);font-size:12.5px;text-decoration:none}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:14px}
+.kv dt{color:var(--dim)} .kv dd{margin:0;font-variant-numeric:tabular-nums;word-break:break-all}
+.mon{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.mon:last-child{border:0}
+.ok{color:var(--ok)} .no{color:var(--warn)}
+
+/* graph */
+#chart{width:100%;height:280px;display:block}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:6px 10px;border-radius:20px;border:1px solid var(--line);font-size:12.5px;display:flex;align-items:center;gap:6px;background:var(--panel2)}
+.chip i{width:9px;height:9px;border-radius:50%}
+.chip b{font-family:var(--num);font-size:16px;font-variant-numeric:tabular-nums}
+.rec{color:var(--bad);font-weight:600;font-size:12.5px;display:none;align-items:center;gap:6px}
+.rec::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--bad);animation:pulse 1s infinite}
+
+/* terminal */
+#term{background:var(--termbg);border:1px solid var(--line);border-radius:14px;height:46vh;overflow:auto;padding:10px;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-all}
+#term .tx{color:var(--accent2)} #term .rx{color:var(--text)} #term .sys{color:var(--faint)}
+.quick{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.quick button{padding:6px 10px;font-size:12px;font-family:ui-monospace,monospace}
+
+/* sheet / modal */
+.scrim{position:fixed;inset:0;background:#000a;display:none;z-index:45;align-items:flex-end;justify-content:center}
+.scrim.open{display:flex}
+.sheet{background:var(--panel);border:1px solid var(--line);border-bottom:0;border-radius:20px 20px 0 0;width:100%;max-width:640px;max-height:82vh;overflow:auto;padding:18px 16px calc(18px + var(--safe-b))}
+.sheet h3{margin:0 0 6px;font-family:var(--num);font-size:22px}
+.sheet .opt{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.sheet .opt.sel{color:var(--accent)}
+.sheet .opt small{color:var(--faint)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + var(--safe-b));background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:13.5px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+.toast.show{opacity:1}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rot .7s linear infinite;vertical-align:-2px}
+@keyframes rot{to{transform:rotate(360deg)}}
+.welcome{text-align:center;padding:26px 14px}
+.welcome h1{font-family:var(--num);font-size:30px;margin:6px 0}
+.welcome p{color:var(--dim);line-height:1.5;margin:8px auto;max-width:420px}
+.welcome .btns{display:flex;flex-direction:column;gap:10px;max-width:320px;margin:20px auto 0}
+.welcome .btns button{padding:14px}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:transparent;border-radius:10px;padding:9px 4px;font-size:13px;color:var(--dim);transition:background .2s,color .2s}
+.seg button.on{background:var(--panel2);color:var(--text);box-shadow:0 1px 0 #ffffff10 inset}
+.mcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin-bottom:10px;overflow:hidden;transition:border-color .2s}
+.mcard.open{border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+.mcard.mine{border-color:var(--ok)}
+.mhead{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;user-select:none}
+.mhead .ic{width:40px;height:40px;border-radius:12px;background:var(--panel2);display:grid;place-items:center;font-size:20px;flex:none;font-family:var(--num);font-weight:700;color:var(--accent)}
+.mhead .t{font-weight:600;font-size:15.5px}
+.mhead .s{font-size:12px;color:var(--dim);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px;background:var(--panel2);color:var(--dim)}
+.pill.both{background:color-mix(in srgb,var(--blue) 14%,transparent);color:var(--blue)} .pill.mine{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.chev{margin-left:auto;transition:transform .25s;color:var(--faint);flex:none}
+.mcard.open .chev{transform:rotate(180deg)}
+.mbody{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease}
+.mcard.open .mbody{grid-template-rows:1fr}
+.mbody>div{overflow:hidden}
+.minner{padding:0 14px 14px}
+.mitem{padding:10px 0;border-top:1px solid var(--line)}
+.mitem b{display:block;font-size:14px;margin-bottom:3px}
+.mitem p{margin:0;font-size:13px;color:var(--dim);line-height:1.5}
+.mitem a{font-size:12px;color:var(--blue);text-decoration:none;display:inline-block;margin-top:4px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 6px}
+.act{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:11px 12px;border-radius:14px;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);transition:transform .12s,border-color .2s}
+.act:hover{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.act .an{font-weight:600;font-size:13.5px}.act .ad{font-size:11.5px;color:var(--dim);line-height:1.35}
+.toolbox{background:var(--panel2);border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;color:var(--dim);margin-top:10px}
+.toolbox b{color:var(--text)}
+.bigread{font-family:var(--num);font-weight:700;font-size:64px;line-height:1;text-align:center;font-variant-numeric:tabular-nums}
+.verdict{text-align:center;font-weight:600;margin:8px 0 2px}
+.gate{position:fixed;inset:0;z-index:50;background:#000c;display:none;align-items:center;justify-content:center;padding:20px}
+.gate.open{display:flex}
+.gate .box{max-width:460px;background:var(--panel);border:1px solid var(--warn);border-radius:18px;padding:20px}
+.termbar{display:none;background:color-mix(in srgb,var(--warn) 10%,transparent);border:1px solid color-mix(in srgb,var(--warn) 33%,transparent);color:var(--warn);border-radius:12px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;align-items:center;gap:10px}
+.termbar.on{display:flex}
+#drive{position:fixed;inset:0;z-index:38;background:var(--dbg);display:none;flex-direction:column;padding:calc(env(safe-area-inset-top,0px) + 6px) 8px calc(env(safe-area-inset-bottom,0px) + 8px);--dtext:var(--text);--dl:var(--dim);--dacc:var(--accent);--dcard:var(--dcard)}
+#drive.open{display:flex}
+#drive.night{--dbg:#000;--dtext:#ff5a3c;--dl:#7a2b20;--dacc:#ff3b1f;--dcard:#070505}
+#drive.night .dw{border-color:#1d0d0a}
+.dtop,.dedit{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.dtop button{background:var(--panel2);border:1px solid var(--line);padding:8px 12px;font-size:14px;border-radius:12px;flex:none}
+#dExit,#dNav,#dTheme,#dNight{width:40px;padding:8px 0;text-align:center}
+#dStat{flex:1;min-width:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;letter-spacing:.3px}
+@media(max-width:430px){#drive .dseg button{padding:6px 9px;font-size:13px}.dtop{gap:5px}.dtop button{padding:8px 9px}}
+@media(max-width:380px){#dStat .dst{display:none}#dExit,#dNav,#dTheme,#dNight{width:36px}#drive .dseg button{padding:6px 7px}}
+.dedit{display:none;flex-wrap:wrap}
+#drive.editing .dedit{display:flex} #drive.editing #dEdit{display:none}
+.dgrid{flex:1;display:grid;gap:8px;grid-auto-flow:dense;min-height:0}
+.dw{position:relative;container-type:size;background:var(--dcard);border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden;transition:transform .15s,box-shadow .2s,border-color .2s;touch-action:none;user-select:none}
+.dw .dl{position:absolute;top:7%;left:0;right:0;text-align:center;color:var(--dl);font-size:max(11px,min(11cqh,7cqw));letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.dw .dv{display:flex;align-items:baseline;gap:.15em;color:var(--dtext);font-family:var(--num);font-weight:700;line-height:.9;font-variant-numeric:tabular-nums;margin-top:max(10px,12cqh)}
+.dw .n{font-size:min(56cqh,30cqw)}
+.dw .u{font-size:min(14cqh,9cqw);color:var(--dl);font-weight:600}
+.dw.bar .n{font-size:min(40cqh,26cqw)}
+.dw .dbar{flex:none;width:84%;margin-top:max(4px,7cqh);height:max(6px,7cqh);background:var(--line);border-radius:99px;overflow:hidden}
+.dgrid.scroll{overflow-y:auto}
+.dw .dbar b{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--dacc));transition:width .25s}
+.dw.gauge .dv{position:absolute;left:0;right:0;bottom:9%;justify-content:center;margin:0}
+.dw.gauge .n{font-size:min(30cqh,20cqw)}
+.dw .dg{position:absolute;left:50%;transform:translateX(-50%);top:20%;height:72%;width:auto;max-width:86%}
+@container (min-aspect-ratio: 2/1){
+  .dw.gauge .dg{left:6%;transform:none;top:24%;height:66%}
+  .dw.gauge .dv{left:auto;right:7%;bottom:auto;top:50%;transform:translateY(-38%);justify-content:flex-end}
+  .dw.gauge .n{font-size:min(50cqh,22cqw)}
+}
+.dw .dg path{fill:none;stroke-width:7;stroke-linecap:round}.dw .dg .tr{stroke:var(--line)}.dw .dg .fl{stroke:var(--dacc)}
+.dw.warn{border-color:var(--warn)}.dw.warn .n{color:var(--warn)}
+.dw.bad{border-color:var(--bad);box-shadow:0 0 0 2px color-mix(in srgb,var(--bad) 33%,transparent) inset}.dw.bad .n{color:var(--bad)}
+#drive.alarm{animation:alarm 1s infinite}
+@keyframes alarm{50%{box-shadow:inset 0 0 0 6px var(--bad)}}
+.dw .dx,.dw .dr{display:none}
+#drive.editing .dw{border-style:dashed;border-color:color-mix(in srgb,var(--accent) 45%,transparent);cursor:grab;animation:jiggle .35s ease-in-out infinite alternate}
+#drive.editing .dw:nth-child(2n){animation-delay:.12s}
+@keyframes jiggle{from{transform:rotate(-.4deg)}to{transform:rotate(.4deg)}}
+#drive.editing .dw.lift{animation:none;z-index:3;box-shadow:0 12px 30px #000c;opacity:.92}
+#drive.editing .dw.target{border-color:var(--ok);border-style:solid}
+#drive.editing .dx{display:grid;place-items:center;position:absolute;top:6px;right:6px;width:30px;height:30px;padding:0;border-radius:50%;background:var(--bad);border:0;color:#fff;font-size:14px;z-index:2}
+#drive.editing .dr{display:block;position:absolute;right:0;bottom:0;width:34px;height:34px;cursor:nwse-resize;z-index:2;background:linear-gradient(135deg,transparent 50%,var(--accent) 50%);border-bottom-right-radius:18px}
+a.btnlink{display:block;text-align:center;text-decoration:none;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:11px 8px;font-size:14px;white-space:nowrap}
+a.btnlink.primary{background:var(--accent);border-color:var(--accent);color:var(--onaccent);font-weight:600}
+.note{font-size:12.5px;color:var(--dim);background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;line-height:1.5;margin-top:14px;text-align:left}
+.note b{color:var(--text)}
+
+/* driving map mode */
+#drive .dseg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;flex:none}
+#drive.night .dseg{background:#120504;border-color:#2a0c08}
+.dseg button{background:transparent;border:0;padding:6px 14px;border-radius:9px;font-size:14px;color:var(--dim)}
+.dseg button.on{background:var(--panel2);color:var(--text)}
+#dMapWrap{display:none;position:relative;flex:1;min-height:0;border-radius:18px;overflow:hidden;border:1px solid #1a1f26}
+#drive.mapmode .dgrid{display:none}
+#drive.mapmode #dMapWrap{display:block}
+#drive.mapmode .dedit,#drive.mapmode #dEdit{display:none!important}
+#dMap{position:absolute;inset:0;background:#0b0f14}
+.maplibregl-map{background:#0b0f14;font-family:var(--ui)}
+.maplibregl-ctrl-attrib{font-size:9px}.maplibregl-ctrl-attrib.maplibregl-compact{background:rgba(0,0,0,.5)}
+.maplibregl-ctrl-attrib a{color:#8a96a3}.maplibregl-ctrl-attrib-button{filter:invert(1)}
+.carfix .cf{width:22px;height:22px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 0 2px var(--accent),0 2px 8px #000a;position:relative}
+.carfix .cf::after{content:'';position:absolute;top:-11px;left:50%;transform:translateX(-50%);border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:9px solid var(--accent)}
+#dMapFallback{display:none;position:absolute;inset:0;z-index:410;align-items:center;justify-content:center;color:var(--dim);background:#0b0f14ee;padding:24px}
+#dGpsMiss{display:none;position:absolute;top:10px;left:10px;max-width:calc(100% - 130px);z-index:420;background:rgba(0,0,0,.6);color:var(--warn);font-size:12px;padding:5px 12px;border-radius:20px}
+#dRecenter{display:none;position:absolute;bottom:calc(30px + var(--rp,0px));left:50%;transform:translateX(-50%);z-index:420;background:var(--accent);color:var(--onaccent);border:0;padding:9px 18px;border-radius:22px;font-weight:600;box-shadow:0 3px 12px #0008}
+#dRecenter.show{display:block}
+#dMapCtl{position:absolute;top:10px;right:10px;z-index:420;display:flex;flex-direction:column;gap:6px}
+#dMapCtl button{width:42px;height:42px;border-radius:12px;background:rgba(10,14,20,.78);color:var(--text);border:1px solid #ffffff22;font-size:20px;font-weight:700;backdrop-filter:blur(4px)}
+#dMapCtl #dMapOpts{width:auto;height:auto;padding:9px 12px;font-size:13px;font-weight:600}
+#dMapCtl #dDir{width:auto;height:auto;padding:9px 12px;font-size:13px;font-weight:600;background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
+#dMapCtl #dCompass .ci{display:inline-block;color:var(--bad);font-size:16px;line-height:1;transition:transform .2s}
+#d3D.on,#dHeadUp.on{background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
+.carfix{width:26px;height:26px}
+#dRoutePanel.min #dRouteSteps{display:none}
+#dRouteSum .chevbtn{margin-left:0;margin-right:4px;padding:2px 8px;font-size:14px;background:transparent;border:0;color:var(--dim)}
+#dRoutePanel.min #dRouteSum .chevbtn{transform:rotate(-90deg)}
+.destpin .dp{width:18px;height:18px;border-radius:50% 50% 50% 0;background:var(--bad);border:3px solid #fff;transform:rotate(-45deg);box-shadow:0 2px 6px #0008}
+#dDirHint{display:none;position:absolute;top:10px;left:10px;max-width:calc(100% - 130px);z-index:420;background:var(--accent);color:var(--onaccent);font-size:13px;font-weight:600;padding:7px 14px;border-radius:20px;box-shadow:0 3px 12px #0008}
+#dRoutePanel{display:none;position:absolute;left:10px;right:10px;bottom:38px;z-index:425;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:16px;padding:12px 14px;max-height:46%;overflow:auto;backdrop-filter:blur(6px)}
+#dRouteSum{font-family:var(--num);font-size:19px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#dRouteSum button{margin-left:auto;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:6px 12px;font-size:13px;font-family:var(--ui)}
+#dRouteSteps{margin-top:8px}
+.rstep{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.rstep small{color:var(--dim);white-space:nowrap}
+#dOverlay{position:absolute;inset:0;bottom:var(--rp,0px);z-index:415;pointer-events:none;--ovop:.82}
+#ovPrimary{position:absolute;left:12px;bottom:36px}
+#ovDials{position:absolute;right:12px;bottom:36px;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+#dMapWrap.routing #ovDials{display:none}
+.ovt{background:color-mix(in srgb,var(--panel) calc(var(--ovop)*100%),transparent);border:1px solid color-mix(in srgb,var(--line) calc(var(--ovop)*100%),transparent);border-radius:14px;padding:7px 12px;backdrop-filter:blur(3px);min-width:92px}
+.ovt .ovl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.ovt .ovv{font-family:var(--num);font-weight:700;font-size:26px;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
+.ovt .ovv span{font-size:12px;color:var(--dim);margin-left:3px;font-weight:600}
+.ovt.big .ovv{font-size:58px}.ovt.big{padding:8px 16px}
+.ovt.warn{border-color:var(--warn)}.ovt.warn .ovv{color:var(--warn)}
+.ovt.bad{border-color:var(--bad)}.ovt.bad .ovv{color:var(--bad)}
+input[type=range]{accent-color:var(--accent)}
+/* theme extras */
+html.glow .tile .val,html.glow .hero .spd,html.glow .hero .rpmtxt,html.glow .dw .n,html.glow .bigread,html.glow .brand{text-shadow:0 0 14px color-mix(in srgb,var(--accent) 65%,transparent)}
+html.glow .dw,html.glow .tile,html.glow .hero{box-shadow:inset 0 0 24px color-mix(in srgb,var(--accent) 7%,transparent)}
+html.hc .card,html.hc .tile,html.hc .mcard,html.hc .dw,html.hc button,html.hc select,html.hc input,html.hc .chip{border-width:2px}
+html.hc .muted,html.hc .small{color:var(--text)}
+html.nomotion *,html.nomotion *::before{animation:none!important;transition:none!important}
+.hsec{padding:10px 0;border-top:1px solid var(--line)}
+.hsec:first-of-type{border-top:0}
+.hsec b{display:block;font-size:14.5px;margin-bottom:3px}
+.hsec p{margin:0;font-size:13.5px;color:var(--dim);line-height:1.5}
+.hsec a{font-size:12.5px;color:var(--blue);text-decoration:none}
+.hsec a.hdonate{color:var(--accent);font-weight:600}
+.hrow{margin-top:14px}
+.ccrow{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--panel)}
+.ccrow [data-run]{cursor:pointer}
+.thgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.thc{border-radius:14px;padding:10px;border:2px solid transparent;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:6px}
+.thc.on{outline:3px solid var(--accent);outline-offset:2px}
+.thc .sw{display:flex;gap:4px}.thc .sw i{width:14px;height:14px;border-radius:50%}
+.thc .big{font-size:30px;font-weight:700;line-height:1}
+.thc .nm{font-size:12.5px;font-weight:600}.thc .ds{font-size:11px;opacity:.75}
+
+/* notched phones held sideways: keep content out of the side insets */
+header,main,nav{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+nav{padding-left:max(6px,env(safe-area-inset-left,0px));padding-right:max(6px,env(safe-area-inset-right,0px))}
+#drive{padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+
+/* short portrait phones: tighter map buttons */
+@media (max-height:720px) and (orientation:portrait){
+  #dMapCtl button{width:38px;height:38px;font-size:18px}
+  #dMapCtl{gap:5px}
+}
+
+/* phone in landscape: compact chrome, gauge beside tiles, map controls in a row */
+@media (orientation:landscape) and (max-height:540px){
+  header{padding-top:calc(var(--safe-t) + 6px);padding-bottom:6px}
+  .brand{font-size:19px}
+  #connBtn{padding:6px 12px}
+  nav{padding-top:3px;padding-bottom:calc(3px + var(--safe-b))}
+  nav button{flex-direction:row;justify-content:center;gap:6px;font-size:12px;padding:7px 0;position:relative}
+  nav button svg{width:18px;height:18px}
+  nav .badge{position:static;margin:0}
+  main{padding-top:10px;padding-bottom:calc(58px + var(--safe-b))}
+  .toast{bottom:calc(62px + var(--safe-b))}
+  #dash{display:grid;grid-template-columns:minmax(260px,40%) 1fr;gap:0 12px;align-items:start}
+  #dash>*{grid-column:2}
+  #dash>.hero{grid-column:1;grid-row:1/span 9;position:sticky;top:0}
+  #dash .tiles{grid-template-columns:repeat(2,1fr);margin-top:0}
+  .hero svg{max-height:calc(100dvh - 150px)}
+  .hero .spd{font-size:60px}
+  #term{height:calc(100dvh - 230px);min-height:120px}
+  #chart{height:max(140px,calc(100dvh - 215px))}
+  .welcome{padding:6px 14px}
+  .welcome>svg{display:none}
+  .welcome h1{font-size:26px;margin:2px 0}
+  .welcome .btns{flex-direction:row;max-width:440px;margin-top:12px}
+  .welcome .btns button{flex:1;padding:12px}
+  .sheet{max-height:92vh}
+  #dMapCtl{flex-direction:row;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 20px - var(--rpw,0px))}
+  #dMapCtl button{width:38px;height:38px;font-size:17px}
+  #dMapCtl #dMapOpts,#dMapCtl #dDir{padding:0 12px;height:38px}
+  #ovDials{flex-direction:row;flex-wrap:wrap-reverse;justify-content:flex-end;max-width:calc(100% - 180px - var(--rpw,0px))}
+  #ovPrimary{left:calc(12px + var(--rpw,0px))}
+  .ovt.big .ovv{font-size:44px}
+  #dDirHint,#dGpsMiss{max-width:max(140px,calc(100% - 430px - var(--rpw,0px)))}
+  #dRoutePanel{right:auto;top:10px;width:min(320px,40%);max-height:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><i id="dot"></i>TORQUE DECK</div>
+  <div class="conninfo" id="connInfo">Not connected</div>
+  <button id="connBtn" class="primary">Connect</button>
+</header>
+
+<main>
+  <!-- DASH -->
+  <section class="view active" id="v-dash">
+    <div id="welcome" class="welcome">
+      <svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="none" style="stroke:var(--accent)" stroke-width="3" stroke-dasharray="140 200" stroke-linecap="round" transform="rotate(140 32 32)"/><path d="M32 32 L46 22" style="stroke:var(--accent2)" stroke-width="3.5" stroke-linecap="round"/><circle cx="32" cy="32" r="4" style="fill:var(--text)"/></svg>
+      <h1>Plug in. Turn the key.</h1>
+      <p>Connect your Bluetooth OBD-II adapter to see live engine data, read and clear trouble codes, graph sensors and log drives.</p>
+      <div class="btns">
+        <button class="primary" id="wConnect">Connect adapter</button>
+        <button id="wDemo">Try demo car</button>
+      </div>
+      <div class="note" id="compatNote"></div>
+    </div>
+    <div id="dash" style="display:none">
+      <div class="hero">
+        <div class="milchip" id="milChip">CHECK ENGINE</div>
+        <div class="rate" id="rate"></div>
+        <svg viewBox="0 0 300 200" id="gauge"></svg>
+        <div class="center">
+          <div class="spd" id="spd">0</div>
+          <div class="spdu" id="spdU">mph</div>
+          <div class="rpmtxt"><span id="rpmV">0</span> <small>RPM</small></div>
+        </div>
+      </div>
+      <div class="tiles" id="tiles"></div>
+      <div class="row" style="margin-top:12px;justify-content:center;gap:8px">
+        <button class="ghost small" id="resetMM">Reset min/max</button>
+        <button class="ghost small" id="editTiles">Add tile</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CODES -->
+  <section class="view" id="v-codes">
+    <div class="card mil" id="milCard">
+      <div class="lamp"><svg viewBox="0 0 24 24"><path d="M4 9h2V7h4V5h6v2h2l1 2h2v6h-2l-1 2h-3l-2 2H9l-2-2H4zM2 10h1v4H2z"/></svg></div>
+      <div class="grow"><div style="font-weight:600" id="milTitle">Check engine light</div><div class="small muted" id="milSub">Read codes to see status</div></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary grow" id="readCodes">Read codes</button>
+      <button class="danger" id="clearCodes">Clear</button>
+    </div>
+    <h2>Trouble codes</h2>
+    <div class="card" id="dtcList"><div class="empty">No scan yet.</div></div>
+    <h2>Freeze frame</h2>
+    <div class="card" id="ffCard"><div class="empty">Snapshot of the engine at the moment a code set.<br><br><button id="readFF">Read freeze frame</button></div></div>
+  </section>
+
+  <!-- GRAPH -->
+  <section class="view" id="v-graph">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <div class="chips" id="gChips"></div>
+    </div>
+    <div class="card" style="padding:8px"><canvas id="chart"></canvas></div>
+    <div class="row wrap" style="margin-top:12px">
+      <button id="gPick">Choose sensors</button>
+      <select id="gWin"><option value="30">30 s</option><option value="60" selected>60 s</option><option value="180">3 min</option><option value="600">10 min</option></select>
+      <div class="grow"></div>
+      <span class="rec" id="recInd">REC <span id="recCount">0</span></span>
+      <button id="recBtn">● Record log</button>
+    </div>
+    <div class="note">Recording captures every sensor being polled (dashboard + graph) with timestamps. Stop to export a CSV you can open in Excel.</div>
+  </section>
+
+  <!-- INFO -->
+  <section class="view" id="v-info">
+    <h2>Vehicle</h2>
+    <div class="card"><dl class="kv" id="vehInfo"><dt>VIN</dt><dd>—</dd></dl>
+      <div class="row" style="margin-top:12px"><button id="readInfo">Read vehicle info</button><button id="vinDecode" class="primary" style="display:none">Decode VIN</button><a id="vinLink" class="small" style="color:var(--blue);display:none" href="https://vpic.nhtsa.dot.gov/decoder/" target="_blank" rel="noopener">NHTSA site ↗</a></div></div>
+    <h2>Emissions readiness</h2>
+    <div class="card" id="monCard"><div class="empty">Shows whether the car would pass an OBD emissions check.<br><br><button id="readMon">Check readiness</button></div></div>
+    <h2>Settings</h2>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;padding:6px 0"><span>Units</span><select id="sUnits"><option value="imp">Imperial (mph, °F)</option><option value="met">Metric (km/h, °C)</option></select></div>
+      <div class="row" style="justify-content:space-between;padding:6px 0"><span>Protocol</span><select id="sProto"></select></div>
+      <div class="row" style="justify-content:space-between;padding:6px 0"><span>RPM redline</span><input id="sRed" type="number" step="250" style="width:100px"></div>
+      <div class="row" style="justify-content:space-between;padding:6px 0"><span>Keep screen awake</span><select id="sWake"><option value="1">On</option><option value="0">Off</option></select></div>
+    </div>
+    <h2>Adapter</h2>
+    <div class="card"><dl class="kv" id="adInfo"><dt>Status</dt><dd>Not connected</dd></dl></div>
+    <div class="note" style="margin-bottom:10px"><b>Install:</b> In Chrome on Android, open the ⋮ menu → <b>Add to Home screen / Install app</b>. It then opens full-screen like a native app.</div>
+    <h2>Help &amp; about</h2>
+    <div class="card"><div class="row" style="gap:8px;flex-wrap:wrap"><button class="grow" id="helpBtn">Help &amp; quick start</button><button class="grow" id="creditsBtn">Open-source credits</button></div>
+      <div class="small muted" style="margin-top:10px;line-height:1.5">Torque Deck is built on free, open-source map and data services. If the maps are useful to you, consider supporting the people who host them.</div></div>
+  </section>
+
+  <!-- MODS -->
+  <section class="view" id="v-mods">
+    <div class="seg" id="modSeg"><button data-s="veh" class="on">Vehicles</button><button data-s="acc">Accessories</button></div>
+    <input id="modSearch" placeholder="Search vehicles, mods, accessories…" style="width:100%;margin:10px 0 4px">
+    <div id="modList"></div>
+    <div class="note">This app <b>reads and monitors</b>. Changing module settings needs the brand tool named on each card. Never disable emissions or safety systems. It’s illegal in most places and can fail inspection or void warranties.</div>
+  </section>
+
+  <!-- TERMINAL -->
+  <section class="view" id="v-term">
+    <div class="termbar" id="termBar"><span class="grow">⚠ Custom module header active. Live polling is paused.</span><button class="small" id="termRestore">Restore normal</button></div>
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="small muted">Raw commands · <b style="color:var(--warn)">use at your own discretion</b></span><button class="ghost small" id="termInfo">Read the warning</button></div>
+    <div id="term"></div>
+    <div class="quick" id="quick"></div>
+    <form class="row" id="termForm"><input id="termIn" class="grow" placeholder="AT or OBD command, e.g. 010C" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="primary">Send</button></form>
+  </section>
+</main>
+
+<nav id="nav">
+  <button data-v="dash" class="active"><svg viewBox="0 0 24 24"><path d="M4 16a8 8 0 1 1 16 0"/><path d="M12 16l4-5"/></svg>Dash</button>
+  <button data-v="codes"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg>Codes<span class="badge" id="codeBadge" style="display:none"></span></button>
+  <button data-v="graph"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 5-7 4 4"/><path d="M3 21h18"/></svg>Graph</button>
+  <button data-v="info"><svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="9" rx="3"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M6 8l2-3h8l2 3"/></svg>Car</button>
+  <button data-v="mods"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>Mods</button>
+  <button data-v="term"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>Terminal</button>
+</nav>
+
+<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+<div class="gate" id="gate"><div class="box">
+  <h3 style="margin:0 0 8px;font-family:var(--num);font-size:24px;color:var(--warn)">⚠ Use at your own discretion</h3>
+  <p class="muted" style="line-height:1.55;font-size:14px;margin:0 0 10px">The terminal sends raw commands straight to your car’s computers. That’s what makes customization possible, and also what makes it risky:</p>
+  <ul class="muted" style="line-height:1.55;font-size:13.5px;padding-left:18px;margin:0 0 12px">
+    <li>Write, reset or routine commands can <b>change module settings, clear data, or leave a module unresponsive</b>.</li>
+    <li>Wrong values can cause warning lights, limp mode, failed inspections or warranty problems.</li>
+    <li>Never send commands while driving. Do it parked, with the ignition on and a healthy battery.</li>
+    <li>Don’t use it to disable emissions or safety systems.</li>
+    <li>You are responsible for what you send. Torque Deck is provided as-is, with no warranty.</li>
+  </ul>
+  <label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;margin:8px 0 14px"><input type="checkbox" id="gateChk" style="margin-top:3px;width:18px;height:18px"> I understand and accept the risk</label>
+  <div class="row"><button class="grow" id="gateNo">Back</button><button class="grow primary" id="gateYes" disabled>Open terminal</button></div>
+</div></div>
+
+<script src="maplibre-gl.js"></script>
+<script src="obd.js"></script>
+<script src="mods.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

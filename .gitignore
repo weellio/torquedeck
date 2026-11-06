@@ -1,0 +1,15 @@
+# secrets (FTP login for deploy.py)
+.env
+.env.*
+
+# old map library, no longer used by the app
+leaflet.js
+leaflet.css
+
+# local junk
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.vscode/
+.claude/
