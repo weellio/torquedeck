@@ -60,6 +60,9 @@ table{width:100%;border-collapse:collapse;font-size:14.5px}
 th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
 th{color:var(--dim);font-weight:600}
 .tablewrap{overflow-x:auto}
+td code{white-space:nowrap;font-size:13.5px}
+td .pill{white-space:nowrap}
+@media(max-width:600px){th,td{padding:9px 5px;font-size:13.5px}}
 .pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--panel);color:var(--dim)}
 .pill.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
 .pill.blue{color:var(--blue);background:color-mix(in srgb,var(--blue) 14%,transparent)}

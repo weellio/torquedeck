@@ -18,7 +18,9 @@ No adapter? Tap **Try demo car** to try every screen with a simulated car.
 - **Driving mode:** a full-screen board for a phone mount, with big high-contrast tiles. Add, move and resize tiles, and pick big-number, bar or gauge style. Presets: Daily, Towing, Performance, Economy, Minimal. Works in portrait and landscape, and has a red night mode and a red flash on danger readings. Editing is locked while the car is moving.
 - **Map view (driving mode):** MapLibre GL map with 3D tilt, heading-up and a follow-the-car camera, with your chosen dials floating on top. The free vector maps (OpenFreeMap) include 3D buildings, and there are Esri satellite imagery and optional 3D terrain. In-app **Directions** uses OSRM for free routing. Add your own free TomTom key to get live traffic and traffic-aware routes.
 - **Mods:** the top-selling US vehicles plus SEMA favorites, and popular accessories. Each card lists common mods, the brand tool that changes settings (FORScan, AlfaOBD, BimmerCode…) and one-tap checks: GPS speedometer check, battery and charging test, drain watch, fuel-trim, towing and economy monitors.
-- **Terminal:** raw AT/OBD commands, quick buttons and a copyable log, behind a one-time "use at your own discretion" agreement.
+- **My mods (Mods tab):** save your own changes to the car (coding, parts, tunes, settings). Store the commands that apply and undo each one, or just mark a part installed or removed. Record a timed test each way, from 30 s to 5 min, on up to 4 sensors. A table then compares stock against modded, averaged over every run. Copy a mod to try new values, and export or import your mods as a file. Changes are confirmed first and blocked while the car is moving.
+- **Terminal:** raw AT/OBD commands, quick buttons, module addressing, a **Command list** of 57 AT, OBD and UDS commands (tap one to put it in the box), and a copyable log. Opens after a one-time "use at your own discretion" agreement.
+- **Full list:** https://obdii.bworldtools.com/features.html lists every sensor, command, tool, vehicle guide, option and theme.
 - **My codes:** save commands you have verified for your own vehicle and run them with one tap. Nothing comes pre-loaded. Every run goes through the same confirmation as the terminal.
 - **Themes:** 14 themes, including High Contrast Dark/Light, Colorblind Safe (Okabe-Ito), Daylight and Red Night. Text size and Reduce motion settings.
 - **Stays connected:** remembers your adapter. If the link drops it reconnects on its own. Classic Bluetooth and USB adapters also reconnect by themselves when you come back to the app. Bluetooth LE adapters take one tap on **Reconnect**, and the list shows only your adapter.
@@ -88,7 +90,7 @@ On Apache, `dot-htaccess.txt` (renamed `.htaccess`) makes `/` show the landing p
 | `mods.js` | Vehicle and accessory guide data |
 | `shop.js` | Adapter picks, trouble-code to part mapping, Amazon links (Associates tag) |
 | `sw.js` | Offline cache for the app files only (never intercepts map tiles) |
-| `home.html`, `codes/`, `sitemap.xml`, `robots.txt` | Landing page and trouble-code pages. **Generated**: edit `tools/build_pages.js` / `tools/code_content.js`, then run `node tools/build_pages.js` |
+| `home.html`, `features.html`, `codes/`, `sitemap.xml`, `robots.txt` | Landing page and trouble-code pages. **Generated**: edit `tools/build_pages.js` / `tools/code_content.js`, then run `node tools/build_pages.js` |
 | `site.css`, `img/` | Styles and screenshots for the landing and code pages |
 | `maplibre-gl.js/.css` | Bundled MapLibre GL JS v4.7.1 (BSD-3) |
 | `manifest.json`, icons | Install as an app |

@@ -263,6 +263,70 @@
     '5': 'ISO 14230-4 KWP (fast)', '6': 'ISO 15765-4 CAN 11-bit 500k', '7': 'ISO 15765-4 CAN 29-bit 500k',
     '8': 'ISO 15765-4 CAN 11-bit 250k', '9': 'ISO 15765-4 CAN 29-bit 250k', 'A': 'SAE J1939 CAN', 'B': 'User CAN 1', 'C': 'User CAN 2' };
 
+
+  // ---------- Terminal command reference (shown in the app and on the website) ----------
+  // risk: 0 = read-only, 1 = changes adapter/session state, 2 = can change or erase data on the car.
+  // The app's own RISKY list decides what needs a confirmation; this is for people reading the list.
+  const COMMANDS = [
+    { g: 'Adapter (AT)', c: 'ATZ', d: 'Reset the adapter', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATWS', d: 'Warm start (quicker reset, keeps settings)', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATD', d: 'Set all adapter settings back to defaults', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATI', d: 'Adapter chip and version', risk: 0 },
+    { g: 'Adapter (AT)', c: 'AT@1', d: 'Adapter description', risk: 0 },
+    { g: 'Adapter (AT)', c: 'ATRV', d: 'Battery voltage at the OBD port', risk: 0 },
+    { g: 'Adapter (AT)', c: 'ATIGN', d: 'Ignition input: ON or OFF (where supported)', risk: 0 },
+    { g: 'Adapter (AT)', c: 'ATDP', d: 'Show the protocol in use', risk: 0 },
+    { g: 'Adapter (AT)', c: 'ATDPN', d: 'Protocol in use, as a number', risk: 0 },
+    { g: 'Adapter (AT)', c: 'ATSP0', d: 'Auto-detect the protocol', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATSP6', d: 'Force a protocol (0–C, 6 = CAN 11-bit 500k)', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATE0', d: 'Echo off (ATE1 = on)', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATL0', d: 'Line feeds off (ATL1 = on)', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATS0', d: 'Spaces off in replies (ATS1 = on)', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATH1', d: 'Show headers, so you can see which module answered (ATH0 = hide)', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATAT1', d: 'Adaptive timing on (ATAT0 off, ATAT2 aggressive)', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATST64', d: 'Reply timeout, hex × 4 ms (64 = 400 ms)', risk: 1 },
+    { g: 'Adapter (AT)', c: 'ATPC', d: 'Close the protocol (the next request reconnects)', risk: 1 },
+    { g: 'Module addressing', c: 'ATSH7DF', d: 'Talk to every engine-related module (OBD broadcast, the normal mode)', risk: 1 },
+    { g: 'Module addressing', c: 'ATSH7E0', d: 'Talk to the engine computer only (11-bit CAN)', risk: 1 },
+    { g: 'Module addressing', c: 'ATSH7E1', d: 'Talk to the transmission computer (11-bit CAN)', risk: 1 },
+    { g: 'Module addressing', c: 'ATCRA7E8', d: 'Only show replies from 7E8 (the engine)', risk: 1 },
+    { g: 'Module addressing', c: 'ATCAF0', d: 'CAN auto-formatting off, for raw frames (ATCAF1 = on)', risk: 1 },
+    { g: 'Module addressing', c: 'ATMA', d: 'Monitor all bus traffic (send any key to stop)', risk: 1 },
+    { g: 'Live data (mode 01)', c: '0100', d: 'Which live sensors this car supports (PIDs 01–20)', risk: 0 },
+    { g: 'Live data (mode 01)', c: '0101', d: 'Check engine light, code count and readiness monitors', risk: 0 },
+    { g: 'Live data (mode 01)', c: '010C', d: 'Engine RPM', risk: 0 },
+    { g: 'Live data (mode 01)', c: '010D', d: 'Vehicle speed', risk: 0 },
+    { g: 'Live data (mode 01)', c: '0105', d: 'Coolant temperature', risk: 0 },
+    { g: 'Live data (mode 01)', c: '0110', d: 'Mass air flow', risk: 0 },
+    { g: 'Live data (mode 01)', c: '0151', d: 'Fuel type', risk: 0 },
+    { g: 'Freeze frame (mode 02)', c: '020200', d: 'The code that triggered the freeze frame', risk: 0 },
+    { g: 'Freeze frame (mode 02)', c: '020C00', d: 'RPM at the moment the code set (any 01 PID works with 02 + 00)', risk: 0 },
+    { g: 'Trouble codes', c: '03', d: 'Stored (confirmed) trouble codes', risk: 0 },
+    { g: 'Trouble codes', c: '07', d: 'Pending trouble codes (seen once, not confirmed yet)', risk: 0 },
+    { g: 'Trouble codes', c: '0A', d: 'Permanent trouble codes (clear only after a repair is proven)', risk: 0 },
+    { g: 'Trouble codes', c: '04', d: 'Clear codes and freeze frame, and reset the readiness monitors', risk: 2 },
+    { g: 'Tests and monitors', c: '0600', d: 'Which on-board monitor tests are supported (mode 06)', risk: 0 },
+    { g: 'Tests and monitors', c: '0601', d: 'Results of on-board monitor test 01 (often the O2 sensors)', risk: 0 },
+    { g: 'Vehicle info (mode 09)', c: '0900', d: 'Which vehicle info items are supported', risk: 0 },
+    { g: 'Vehicle info (mode 09)', c: '0902', d: 'VIN', risk: 0 },
+    { g: 'Vehicle info (mode 09)', c: '0904', d: 'Calibration ID (software version)', risk: 0 },
+    { g: 'Vehicle info (mode 09)', c: '0906', d: 'Calibration verification number (CVN)', risk: 0 },
+    { g: 'Vehicle info (mode 09)', c: '090A', d: 'ECU name', risk: 0 },
+    { g: 'Enhanced (UDS, per module)', c: '22F190', d: 'Read the VIN stored in this module', risk: 0 },
+    { g: 'Enhanced (UDS, per module)', c: '22F187', d: 'Read the module part number', risk: 0 },
+    { g: 'Enhanced (UDS, per module)', c: '22F18C', d: 'Read the module serial number', risk: 0 },
+    { g: 'Enhanced (UDS, per module)', c: '22F195', d: 'Read the module software version', risk: 0 },
+    { g: 'Enhanced (UDS, per module)', c: '1902FF', d: 'Read this module\u2019s own trouble codes (UDS)', risk: 0 },
+    { g: 'Enhanced (UDS, per module)', c: '3E00', d: 'Tester present (keeps a session open)', risk: 0 },
+    { g: 'Enhanced (UDS, per module)', c: '1001', d: 'Back to the default session', risk: 1 },
+    { g: 'Enhanced (UDS, per module)', c: '1003', d: 'Extended session (needed before most writes)', risk: 2 },
+    { g: 'Enhanced (UDS, per module)', c: '2E…', d: 'Write a value (write data by identifier). Only with a value you verified for your car', risk: 2 },
+    { g: 'Enhanced (UDS, per module)', c: '31…', d: 'Run a routine (relearns, tests, resets). Can move parts', risk: 2 },
+    { g: 'Enhanced (UDS, per module)', c: '2F…', d: 'Take control of an output (actuator test)', risk: 2 },
+    { g: 'Enhanced (UDS, per module)', c: '14FFFFFF', d: 'Clear this module\u2019s trouble codes', risk: 2 },
+    { g: 'Enhanced (UDS, per module)', c: '1101', d: 'Reset (reboot) the module', risk: 2 }
+  ];
+
   // ---------- Transports ----------
   class BleTransport {
     constructor() { this.dev = null; this.rx = null; this.tx = null; this.onData = null; this.onDisconnect = null; this.name = ''; }
@@ -507,6 +571,6 @@
     }
   }
 
-  const API = { decodeVin, SerialTransport, PIDS, EXTRA, DTC_DB, PROTOCOLS, BLE_SERVICES, dtcDescription, parseFrames, decodePid, decodeSupported, decodeDtcs, decodeInfo, decodeStatus, dtcFromBytes, BleTransport, SimTransport, Elm327 };
+  const API = { decodeVin, SerialTransport, PIDS, EXTRA, DTC_DB, COMMANDS, PROTOCOLS, BLE_SERVICES, dtcDescription, parseFrames, decodePid, decodeSupported, decodeDtcs, decodeInfo, decodeStatus, dtcFromBytes, BleTransport, SimTransport, Elm327 };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.OBD = API;
 })(typeof window !== 'undefined' ? window : globalThis);

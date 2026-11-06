@@ -14,7 +14,7 @@ FILES = ['index.html', 'app.js', 'obd.js', 'mods.js', 'shop.js', 'sw.js', 'manif
          'maplibre-gl.js', 'maplibre-gl.css', 'icon-192.png', 'icon-512.png']
 HTACCESS = ('dot-htaccess.txt', '.htaccess')
 # landing page + SEO pages (built by: node tools/build_pages.js)
-SITE_FILES = ['home.html', 'site.css', 'sitemap.xml', 'robots.txt']
+SITE_FILES = ['home.html', 'features.html', 'site.css', 'sitemap.xml', 'robots.txt']
 SITE_DIRS = ['img', 'codes']
 
 

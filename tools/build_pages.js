@@ -47,7 +47,7 @@ ${jsonld.map(j => `<script type="application/ld+json">${JSON.stringify(j)}</scri
 <body>
 <header class="top"><div class="wrap">
   <a class="logo" href="${up || './'}"><i></i>TORQUE DECK</a>
-  <nav><a href="${up}#features">Features</a><a href="${up}#adapters">Adapters</a><a href="${up}codes/">Trouble codes</a><a href="${up}#faq">FAQ</a><a href="${GITHUB}">GitHub</a></nav>
+  <nav><a href="${up}features.html">Everything built in</a><a href="${up}#adapters">Adapters</a><a href="${up}codes/">Trouble codes</a><a href="${up}#faq">FAQ</a><a href="${GITHUB}">GitHub</a></nav>
   <a class="btn primary small" href="${up}index.html">Open the app</a>
 </div></header>`;
 }
@@ -110,7 +110,7 @@ function landing() {
 
 <section class="alt" id="features"><div class="wrap">
   <h2>Everything a $100 scan app does</h2>
-  <p class="sub">Without a subscription, and without handing your data to anyone.</p>
+  <p class="sub">Without a subscription, and without handing your data to anyone. <a href="features.html">See the full list: ${Object.keys(OBD.PIDS).length + 2} sensors, ${OBD.COMMANDS.length} commands, ${TOOLS_LIST.length} tools →</a></p>
   <div class="grid">
     ${[['⚠️', 'Check engine codes', 'Stored, pending and permanent codes in plain English, freeze frame data, and a safe clear with a confirmation.'],
       ['📈', 'Live data and graphs', 'Up to 3 sensors on one graph, from 30 seconds to 10 minutes. Record a drive and export it to Excel as CSV.'],
@@ -124,7 +124,15 @@ function landing() {
   </div>
 </div></section>
 
-<section><div class="wrap">
+<section><div class="wrap" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:30px;align-items:center">
+  <div><h2>Save, undo and test your own mods</h2>
+  <p class="sub" style="margin-bottom:14px">Most scan apps stop at reading codes. Torque Deck keeps each change you make as a card for your car: apply it, undo it, record a timed test each way, and compare stock against modded in a table.</p>
+  <ul style="color:var(--dim);margin:0 0 18px;padding-left:20px;line-height:1.7"><li>Your own apply and undo commands, confirmed before they run</li><li>Parts and tunes too: mark them modded or stock</li><li>Tests averaged over every run, so results get more reliable</li><li>Copy a mod to try new values; export and import</li></ul>
+  <div class="btns"><a class="btn primary" href="features.html#mymods">How My mods works</a><a class="btn" href="features.html">Everything built in</a></div></div>
+  <div class="phone" style="max-width:280px"><img src="img/shot-mymods.webp" loading="lazy" width="390" height="844" alt="My mods comparing stock and modded test results"></div>
+</div></section>
+
+<section class="alt"><div class="wrap">
   <h2>How it works</h2>
   <p class="sub">About two minutes from opening the box to live data.</p>
   <div class="steps">
@@ -264,12 +272,120 @@ const q = new URLSearchParams(location.search).get('q'); if (q) { box.value = q;
 ` + foot(1);
 }
 
+
+// ---------- "Everything built in" page: generated from the app's own data ----------
+global.window = global.window || {};
+require(path.join(ROOT, 'mods.js'));
+const MODS = global.window.MODS;
+const THEMES = [...fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8').split('const THEMES')[1].split('};')[0].matchAll(/name: '([^']+)'/g)].map(m => m[1]);
+const TOOLS_LIST = [
+  ['My mods', 'Save your own changes (coding, parts, tunes, settings) with apply and undo commands. Record a timed test each way and compare stock against modded, averaged over every run.'],
+  ['My codes', 'Save commands you verified for your car as one-tap favourites, kept per vehicle.'],
+  ['Speedometer check', 'Your speedometer against GPS, as a % error. Use it after a tire or gear change.'],
+  ['Battery & charging test', 'Resting voltage, running voltage and a pass/fail for the alternator.'],
+  ['Parasitic drain watch', '10-minute battery voltage trend with the engine off.'],
+  ['Fuel-trim watch', 'Short and long fuel trims with airflow, for vacuum leaks and fuel problems.'],
+  ['Performance monitor', 'Timing advance (knock), intake temperature and RPM.'],
+  ['Towing monitor', 'Coolant temperature, engine load and intake temperature over 10 minutes.'],
+  ['Economy A/B test', 'Measures what an accessory or habit costs in fuel economy.'],
+  ['Emissions readiness', 'Every readiness monitor with a plain "ready for inspection" answer.'],
+  ['Freeze frame', 'Engine conditions at the moment a trouble code was set.'],
+  ['Look at them together', 'Spots codes that usually share one root cause, like lean on both banks.'],
+  ['All sensors', 'Every live value your car reports, with the raw hex reply.'],
+  ['Record a drive', 'Logs every polled sensor with timestamps and exports a CSV for Excel.'],
+  ['Copy report', 'A full text report of the car, codes and readings to paste into an AI chat or text to a mechanic.'],
+  ['HUD mode', 'A mirrored display for reflecting in the windshield at night.'],
+  ['Terminal', 'Raw AT and OBD commands with quick buttons, module addressing, a command list and a copyable log.']
+];
+const OPTIONS = [
+  ['App settings', ['Units: imperial (mph, °F) or metric (km/h, °C)', 'Protocol: auto-detect or any of 9 OBD protocols', 'RPM redline for the gauge', 'Keep screen awake', 'Polling speed: fast, normal or gentle (for slow adapters)', 'Warning alerts with vibration', 'Auto-reconnect to your adapter', 'Text size: normal, large, extra large', 'Reduce motion']],
+  ['Dashboard', ['RPM gauge with your redline and a big speed readout', 'Tiles for any sensor: tap a tile to change it, add as many as you want', 'Sparklines, min/max and warning colours on every tile', 'Trip computer: distance, fuel used, average economy, top speed']],
+  ['Driving mode', ['Full-screen board for a phone mount, portrait or landscape', 'Add, remove, drag and resize tiles', 'Tile sizes: S, Wide, M, L, XL', 'Tile styles: big number, number + bar, gauge', 'Presets: Daily driver, Towing, Performance, Economy, Minimal', 'Red night mode, and a red flash on danger readings', 'Layout editing locks while the car is moving']],
+  ['Map view', ['Styles: Dark, Streets, Light (free vector maps) and Satellite', '3D buildings, 3D terrain, tilt and rotate', 'Follow me, heading-up and speed-based auto-zoom', 'Dials over the map: one big dial and up to 4 small ones, adjustable transparency', 'Free directions with a step list; live traffic with your own free TomTom key', 'One tap to open Google Maps, Waze or Apple Maps']],
+  ['Graphs and logs', ['Up to 3 sensors on separate scales', 'Windows of 30 s, 1 min, 3 min or 10 min', 'Record a drive and export CSV']],
+  ['Safety', ['One-time "use at your own discretion" agreement before the terminal opens', 'Confirmation before any write, reset, routine, security or clear command', 'Live data pauses automatically while you address one module, and restores after', 'No key or immobilizer programming, and nothing that defeats emissions or safety systems']]
+];
+
+function features() {
+  const sensors = Object.entries(OBD.PIDS).concat(Object.entries(OBD.EXTRA || {}));
+  const unit = m => m.imp ? `${m.unit} / ${m.imp[0]}` : m.unit;
+  const range = m => `${m.min} to ${m.max} ${m.unit}`;
+  const groups = [...new Set(OBD.COMMANDS.map(c => c.g))];
+  const riskTxt = ['Read only', 'Adapter', 'Changes car'];
+  const toc = [['standout', 'What stands out'], ['mymods', 'My mods'], ['sensors', `${sensors.length} live sensors`], ['tools', `${TOOLS_LIST.length} tools and tests`], ['commands', `${OBD.COMMANDS.length} terminal commands`], ['vehicles', `${MODS.V.length} vehicle mod guides`], ['accessories', `${MODS.A.length} accessory guides`], ['options', 'Options and settings'], ['themes', `${THEMES.length} themes`]];
+  return head({ title: 'Everything Built Into Torque Deck: Sensors, Commands, Mods and Options', url: SITE + '/features.html',
+    desc: `The full list: ${sensors.length} live sensors, ${OBD.COMMANDS.length} terminal commands, ${TOOLS_LIST.length} built-in tests, mod guides for ${MODS.V.length} vehicles, and a workshop to save, undo and test your own mods. Free.` }) + `
+<main class="wrap article">
+  <div class="crumbs"><a href="./">Torque Deck</a> › Everything built in</div>
+  <div class="codehead"><h1 style="font:700 clamp(32px,5.5vw,50px)/1.05 var(--num)">Everything built in</h1>
+  <p class="sub">The complete list of what Torque Deck does. All of it is free, runs in your browser and works offline.</p></div>
+  <div class="chips" style="margin-bottom:10px">${toc.map(([id, t]) => `<a class="chip" href="#${id}" style="font:600 14px var(--ui)">${esc(t)}</a>`).join('')}</div>
+
+  <section id="standout" style="padding:26px 0 10px"><h2>What stands out</h2>
+  <div class="grid">${[
+    ['🧪', 'A mod workshop, not just a code reader', 'Save your own changes with apply and undo commands, record a test each way, and see the difference in numbers.'],
+    ['📲', 'Nothing to install', 'Runs in Chrome on Android, computers and Bluefy on iPhone. Install it to your home screen if you like.'],
+    ['🗺️', 'Engine dials on a live map', 'A 3D map with your readings floating on top and free turn-by-turn directions.'],
+    ['✅', 'Inspection answer in one tap', 'Every readiness monitor, summed up as "ready for inspection" or not.'],
+    ['🧠', 'Codes read together', 'Spots codes that share one cause, and links each code to a plain-English guide.'],
+    ['🔓', 'Free and open-source', 'No subscription, no account, no ads. MIT licensed, on GitHub.']]
+    .map(([i, t, d]) => `<div class="card"><div class="ic">${i}</div><h3>${t}</h3><p>${d}</p></div>`).join('')}</div></section>
+
+  <section id="mymods" style="padding:26px 0 10px"><h2>My mods: save, undo and test your own changes</h2>
+  <p>Changing a setting, swapping a part or trying a tune is only half the job. The other half is knowing what it did. My mods keeps each change you make as a card for your car:</p>
+  <ul>
+    <li><b>Apply and revert.</b> Store the commands that make the change and the ones that undo it (from your brand tool or a community guide you trust). Each run asks for confirmation, and changes are blocked while the car is moving.</li>
+    <li><b>Parts and tunes too.</b> No commands needed: mark it modded when you install it and stock when you take it off.</li>
+    <li><b>Record a test.</b> Pick up to 4 sensors (presets for engine basics, fuel trims, performance, economy, cooling and charging), choose 30 seconds to 5 minutes, and label the run stock or modded.</li>
+    <li><b>Compare.</b> A table shows the stock and modded averages side by side with the change in %. Every extra run is averaged in, so the result gets more reliable each time.</li>
+    <li><b>Try new values.</b> Copy a mod to test a different value without losing the original and its history.</li>
+    <li><b>Back up and share.</b> Export your mods to a file and import them on another phone.</li>
+  </ul></section>
+
+  <section id="sensors" style="padding:26px 0 10px"><h2>${sensors.length} live sensors</h2>
+  <p>Torque Deck asks your car which of these it supports and only shows those. Every one can be a dashboard tile, a driving-mode tile, a graph line or a My mods test sensor.</p>
+  <div class="tablewrap"><table><tr><th>Sensor</th><th>Short name</th><th>Units</th><th>Range</th><th>PID</th></tr>
+  ${sensors.map(([k, m]) => `<tr><td>${esc(m.name)}</td><td>${esc(m.short)}</td><td>${esc(unit(m))}</td><td>${esc(range(m))}</td><td>${/^[0-9A-F]{2}$/.test(k) ? '01 ' + k : 'calculated'}</td></tr>`).join('\n  ')}
+  </table></div></section>
+
+  <section id="tools" style="padding:26px 0 10px"><h2>${TOOLS_LIST.length} tools and tests</h2>
+  <div class="grid">${TOOLS_LIST.map(([t, d]) => `<div class="card"><h3>${esc(t)}</h3><p>${esc(d)}</p></div>`).join('')}</div>
+  <p style="margin-top:14px">Plus a guide for <a href="codes/">${CODES.length} trouble codes</a>: meaning, causes, whether it is safe to drive and what to check.</p></section>
+
+  <section id="commands" style="padding:26px 0 10px"><h2>${OBD.COMMANDS.length} terminal commands</h2>
+  <p>The terminal sends raw commands to your adapter and car. In the app, tap <b>Command list</b> to drop any of these into the box. Commands that can change the car always ask first.</p>
+  ${groups.map(g => `<h3 style="margin-top:20px">${esc(g)}</h3><div class="tablewrap"><table><tr><th>Command</th><th>What it does</th><th>Effect</th></tr>${OBD.COMMANDS.filter(c => c.g === g).map(c => `<tr><td><code>${esc(c.c)}</code></td><td>${esc(c.d)}</td><td>${c.risk === 2 ? '<span class="pill" style="color:var(--warn)">' : c.risk === 1 ? '<span class="pill">' : '<span class="pill ok">'}${riskTxt[c.risk]}</span></td></tr>`).join('')}</table></div>`).join('\n  ')}
+  </section>
+
+  <section id="vehicles" style="padding:26px 0 10px"><h2>Mod guides for ${MODS.V.length} vehicles</h2>
+  <p>The best-selling US vehicles and SEMA favourites, each with the common mods, the brand tool that changes module settings, and one-tap checks in the app.</p>
+  ${MODS.V.map(v => { const T = MODS.TOOLS[v.tool] || MODS.TOOLS.other; return `<details><summary>${esc(v.name)} <span class="pill" style="margin-left:auto">${esc(v.rank)}</span></summary>
+    <ul>${v.mods.map(([t, d]) => `<li><b>${esc(t)}.</b> ${esc(d)}</li>`).join('')}</ul><p><b>Changes settings with:</b> ${esc(T.name)}. ${esc(T.note)}</p></details>`; }).join('\n  ')}
+  </section>
+
+  <section id="accessories" style="padding:26px 0 10px"><h2>${MODS.A.length} accessory guides</h2>
+  ${MODS.A.map(a => `<details><summary>${a.icon} ${esc(a.name)}</summary><p>${esc(a.why)}</p><ul>${a.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></details>`).join('\n  ')}
+  </section>
+
+  <section id="options" style="padding:26px 0 10px"><h2>Options and settings</h2>
+  <div class="grid">${OPTIONS.map(([t, list]) => `<div class="card"><h3>${esc(t)}</h3><ul style="margin:6px 0 0;padding-left:18px">${list.map(x => `<li style="font-size:14.5px;color:var(--dim)">${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div></section>
+
+  <section id="themes" style="padding:26px 0 10px"><h2>${THEMES.length} themes</h2>
+  <p>Including high-contrast, colourblind-safe and daylight themes. Themes apply to driving mode too.</p>
+  <div class="chips">${THEMES.map(t => `<span class="chip" style="font:600 14px var(--ui)">${esc(t)}</span>`).join('')}</div></section>
+
+  <div class="btns" style="margin:30px 0 10px"><a class="btn primary" href="index.html">Open Torque Deck</a><a class="btn" href="index.html#demo">Try the demo car</a></div>
+</main>
+` + foot(0);
+}
+
 // ---------- write ----------
 fs.mkdirSync(path.join(ROOT, 'codes'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'home.html'), landing());
+fs.writeFileSync(path.join(ROOT, 'features.html'), features());
 fs.writeFileSync(path.join(ROOT, 'codes', 'index.html'), codeIndex());
 CODES.forEach(c => fs.writeFileSync(path.join(ROOT, 'codes', slug(c)), codePage(c)));
-const urls = [SITE + '/', SITE + '/index.html', SITE + '/codes/', ...CODES.map(c => `${SITE}/codes/${slug(c)}`)];
+const urls = [SITE + '/', SITE + '/index.html', SITE + '/features.html', SITE + '/codes/', ...CODES.map(c => `${SITE}/codes/${slug(c)}`)];
 fs.writeFileSync(path.join(ROOT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(u => `  <url><loc>${u}</loc><lastmod>${TODAY}</lastmod></url>`).join('\n')}\n</urlset>\n`);
 fs.writeFileSync(path.join(ROOT, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
 console.log(`home.html + codes/index.html + ${CODES.length} code pages + sitemap (${urls.length} urls)`);

@@ -226,10 +226,10 @@
     let rr = 0;
     while (polling && connected && !customHeader) {
       const fast = ['0C', '0D'];
-      const want = new Set(S.tiles.concat(S.graph).concat(view === 'sens' ? [] : []));
-      if (want.has('MPG')) { want.add('10'); want.add('0D'); }
+      const want = new Set(S.tiles.concat(S.graph));
       if (rec) rec.extra.forEach(p => want.add(p));
       extraPoll.forEach(p => want.add(p));
+      if (want.has('MPG')) { want.add('10'); want.add('0D'); }
       if (driveOn) S.drive.widgets.forEach(w => { if (w.kind === 'pid') want.add(w.pid); });
       want.delete('MPG'); fast.forEach(p => want.delete(p));
       const slow = [...want].filter(p => supportedHas(p));
@@ -768,6 +768,7 @@
     setCustomHeader(false); pollLoop();
   }
   $('#termRestore').onclick = restoreNormal;
+  $('#termRef').onclick = () => commandSheet();
   $('#quick').insertAdjacentHTML('afterend', `<div class="small muted" style="margin:-2px 0 6px">Module addressing (11-bit CAN). This <b>pauses live data</b> until you restore.</div>
     <div class="quick" id="quick2"><button data-c="ATSH7E0">Engine 7E0</button><button data-c="ATSH7E1">Trans 7E1</button><button data-c="ATSH7DF">Broadcast 7DF</button><button data-c="22F190">22 F190 (VIN DID)</button></div>`);
   $('#quick2').onclick = e => { const c = e.target.dataset.c; if (c) termSend(c); };
@@ -902,7 +903,7 @@
       <div class="mbody"><div><div class="minner">
         <div class="small muted" style="margin:2px 0 4px;font-weight:600;letter-spacing:.4px">POPULAR MODS</div>
         ${v.mods.map(([t, d]) => `<div class="mitem"><b>${esc(t)}</b><p>${esc(d)}</p><a target="_blank" rel="noopener" href="${guide(v.name, t, T.name)}">Find a guide ↗</a></div>`).join('')}
-        <div class="small muted" style="margin:14px 0 0;font-weight:600;letter-spacing:.4px">DO IT WITH TORQUE DECK</div>${actBtns(v.actions)}
+        <div class="small muted" style="margin:14px 0 0;font-weight:600;letter-spacing:.4px">DO IT WITH TORQUE DECK</div>${actBtns(v.actions.concat(['mymods']))}
         <div class="toolbox"><b>To change settings: ${esc(T.name)}.</b> ${esc(T.note)}</div>
       </div></div></div></div>`;
   }
@@ -925,7 +926,7 @@
     const make = (nhtsa && nhtsa.Make || (OBD.decodeVin(lastVin) || {}).make || '').toLowerCase();
     const T = MODS.TOOLS[MODS.MAKE_TOOL[make] || 'other'];
     return `<div class="mcard mine open" data-id="mine"><div class="mhead"><div class="ic">★</div><div><div class="t">Your ${esc(n)}</div><div class="s"><span class="pill mine">Connected vehicle</span><span class="pill">${esc(T.name)}</span></div></div></div>
-      <div class="mbody"><div><div class="minner">${actBtns(['codes', 'ready', 'charge', 'trims', 'speedo', 'econ'])}
+      <div class="mbody"><div><div class="minner">${actBtns(['mymods', 'codes', 'ready', 'charge', 'trims', 'speedo', 'econ'])}
       <div class="toolbox"><b>To change settings: ${esc(T.name)}.</b> ${esc(T.note)}</div>
       <a class="btnlink" style="margin-top:8px" target="_blank" rel="noopener" href="${guide(n, 'hidden features customization', T.name)}">Find customizations for your ${esc(n)} ↗</a></div></div></div></div>`;
   }
@@ -947,8 +948,10 @@
     let html = '';
     if (q) {
       const vs = MODS.V.filter(v => hay([v.name, v.mods, v.rank, (MODS.TOOLS[v.tool] || {}).name]).includes(q)), as = MODS.A.filter(a => hay([a.name, a.why, a.tips]).includes(q));
-      html = vs.map(v => vehCard(v, isMine(v))).join('') + as.map(accCard).join('');
+      html = myModsHtml(q) + vs.map(v => vehCard(v, isMine(v))).join('') + as.map(accCard).join('');
       if (!html) html = '<div class="empty">Nothing matched. Try “tires”, “battery” or a model name.</div>';
+    } else if (modSeg === 'mine') {
+      html = myModsHtml('');
     } else if (modSeg === 'shop') {
       html = `<p class="small muted" style="margin:6px 2px 4px;line-height:1.5">Torque Deck works with Bluetooth LE ELM327 adapters on any phone, and Classic Bluetooth ones on Android.</p>` + scannerHtml();
     } else if (modSeg === 'acc') {
@@ -1300,6 +1303,234 @@
       : '<div class="empty">No saved codes yet. Save commands you use often, like enabling a feature or reading a module, so they\'re one tap next time.</div>');
   }
   ACTIONS.codes2 = { n: 'My codes', d: 'Saved commands for your car', run: () => { show('term'); setTimeout(() => $('#codesWrap').scrollIntoView({ behavior: 'smooth' }), 100); } };
+  // ---------- MY MODS: your own changes, applied, undone and tested again and again ----------
+  // A mod is a change you make to your car: a coding change (commands you verified), a part, a tune
+  // or a setting. Apply / revert sends YOUR commands through the same confirmation as the terminal.
+  // Tests record live sensors for a set time and label the run Stock or Modded, so you can compare.
+  const MM_TYPES = { coding: ['💻', 'Coding change'], part: ['🔧', 'Part / hardware'], tune: ['⚡', 'Tune'], setting: ['⚙️', 'Setting / habit'] };
+  const MM_WATCH = { 'Engine basics': ['0C', '04', '0F'], 'Fuel trims': ['06', '07', '10'], 'Performance': ['0E', '0F', '0C'],
+    'Economy': ['MPG', '0D', '04'], 'Cooling / towing': ['05', '04', '0F'], 'Charging': ['VBAT', '42'] };
+  function loadMods() { try { return JSON.parse(localStorage.getItem('td.mods') || '[]'); } catch (e) { return []; } }
+  function saveMods(a) { try { localStorage.setItem('td.mods', JSON.stringify(a)); } catch (e) { toast('Could not save: storage full'); } }
+  const getMod = id => loadMods().find(m => m.id === id);
+  function putMod(mod) { const all = loadMods(), i = all.findIndex(m => m.id === mod.id); if (i >= 0) all[i] = mod; else all.push(mod); saveMods(all); }
+  const isMovingNow = () => { const s = data['0D'] && data['0D'].v; return connected && !demo && s != null && s > 5; };
+  const when = t => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  // Send a list of commands with one confirmation. Returns the replies, or null if cancelled/failed.
+  async function runModCmds(mod, cmds, verb) {
+    if (!elm || !connected) { toast('Connect first'); return null; }
+    if (isMovingNow()) { toast('Park the car first: changes are blocked while moving'); return null; }
+    const risky = cmds.filter(c => RISKY.find(([re]) => re.test(c.toUpperCase().replace(/\s+/g, ''))));
+    const ok = await confirmSheet(`${verb} “${esc(mod.name)}”?`,
+      `On <b>${esc(mod.veh)}</b>, this sends:<code style="display:block;background:var(--termbg);padding:8px;border-radius:8px;margin:8px 0;font:12px ui-monospace,monospace;color:var(--text)">${cmds.map(esc).join('<br>')}</code>` +
+      (risky.length ? '<b style="color:var(--warn)">This writes to or resets a module.</b> ' : '') +
+      'Only run commands you verified for <b>this exact vehicle</b>. Parked, ignition on, battery healthy.', verb, risky.length > 0);
+    if (!ok) return null;
+    log('sys', `▶ ${verb} "${mod.name}"`);
+    const replies = []; let paused = false;
+    for (const c of cmds) {
+      const raw = c.toUpperCase().replace(/\s+/g, '');
+      if (/^ATSH|^ATCRA|^ATCP|^ATSP|^ATTP|^ATCF|^ATCM/.test(raw)) { setCustomHeader(true); paused = true; }
+      try { replies.push(String(await elm.send(c.toUpperCase(), 10000)).replace(/>/g, ' ').replace(/\s+/g, ' ').trim()); }
+      catch (e) { log('sys', 'Stopped: ' + e.message); toast('Stopped on error: ' + c); replies.push('ERROR ' + e.message); if (paused) await restoreNormal(); return { replies, failed: true }; }
+      await new Promise(r => setTimeout(r, 120));
+    }
+    if (paused) await restoreNormal();
+    log('sys', `■ ${verb} done "${mod.name}"`);
+    return { replies, failed: false };
+  }
+  async function modAction(id, act) {
+    const mod = getMod(id); if (!mod) return;
+    const entry = { t: Date.now(), kind: act };
+    if (act === 'apply' || act === 'revert') {
+      const cmds = act === 'apply' ? mod.apply : mod.revert;
+      if (cmds.length) {
+        const r = await runModCmds(mod, cmds, act === 'apply' ? 'Apply' : 'Revert'); if (!r) return;
+        Object.assign(entry, { cmds, reply: r.replies.join(' | ').slice(0, 300), failed: r.failed });
+        if (r.failed) { mod.log.unshift(entry); putMod(mod); renderMods(); return; }
+      }
+      mod.state = act === 'apply' ? 'mod' : 'stock'; entry.state = mod.state;
+      mod.log.unshift(entry); putMod(mod); renderMods();
+      toast(act === 'apply' ? 'Marked as modded. Run a test to measure it.' : 'Back to stock. Run a test to compare.');
+    } else if (act === 'read') {
+      const r = await runModCmds(mod, mod.read, 'Read'); if (!r) return;
+      Object.assign(entry, { cmds: mod.read, reply: r.replies.join(' | ').slice(0, 300) });
+      mod.log.unshift(entry); putMod(mod); renderMods();
+    } else if (act === 'test') testSheet(mod);
+    else if (act === 'edit') editModSheet(mod);
+    else if (act === 'dup') { const c = JSON.parse(JSON.stringify(mod)); Object.assign(c, { id: 'm' + Date.now(), name: mod.name + ' (copy)', log: [], state: 'stock' }); putMod(c); openCard = c.id; renderMods(); toast('Copied. Edit the copy to try different values.'); }
+    else if (act === 'del') { if (await confirmSheet('Delete “' + esc(mod.name) + '”?', 'Its test history is deleted too.', 'Delete', true)) { saveMods(loadMods().filter(m => m.id !== id)); renderMods(); } }
+  }
+
+  // ---------- recording a test ----------
+  function testSheet(mod) {
+    if (!connected) { toast('Connect first to record a test'); return; }
+    let label = mod.state === 'mod' ? 'mod' : 'stock', dur = mod.dur || 60, timer = null;
+    const watch = mod.watch.length ? mod.watch : MM_WATCH['Engine basics'];
+    const durs = [[30, '30 s'], [60, '1 min'], [120, '2 min'], [300, '5 min']];
+    sheet(`<h3>Test: ${esc(mod.name)}</h3>
+      <p class="small muted" style="line-height:1.5">Drive or idle the same way every time (same road, same speed, engine warm) so the numbers compare fairly.</p>
+      <div class="small muted" style="margin:12px 0 6px">THIS RUN IS</div><div class="seg" id="tsState"><button data-v="stock" class="${label === 'stock' ? 'on' : ''}">Stock</button><button data-v="mod" class="${label === 'mod' ? 'on' : ''}">Modded</button></div>
+      <div class="small muted" style="margin:12px 0 6px">LENGTH</div><div class="seg" id="tsDur">${durs.map(([s, l]) => `<button data-v="${s}" class="${s === dur ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <div id="tsLive" style="display:grid;grid-template-columns:repeat(${Math.min(watch.length, 3)},1fr);gap:8px;margin-top:14px">${watch.map(p => `<div class="card" style="padding:10px"><div class="small muted">${esc(meta(p).short)}</div><div class="bigread" style="font-size:28px;text-align:left" data-p="${p}">—</div></div>`).join('')}</div>
+      <div class="tile" style="min-height:0;padding:0;margin-top:12px;cursor:default"><div class="bar" style="margin:0;height:8px"><b id="tsBar"></b></div></div>
+      <div class="row" style="margin-top:14px"><button class="grow" id="tsCancel">Cancel</button><button class="primary grow" id="tsGo">Start recording</button></div>`, el => {
+      el.querySelectorAll('#tsState button').forEach(b => b.onclick = () => { label = b.dataset.v; el.querySelectorAll('#tsState button').forEach(x => x.classList.toggle('on', x === b)); });
+      el.querySelectorAll('#tsDur button').forEach(b => b.onclick = () => { if (timer) return; dur = +b.dataset.v; el.querySelectorAll('#tsDur button').forEach(x => x.classList.toggle('on', x === b)); });
+      watch.forEach(p => extraPoll.add(p)); if (watch.includes('MPG')) { extraPoll.add('10'); extraPoll.add('0D'); }
+      const live = setInterval(() => el.querySelectorAll('[data-p]').forEach(n => { const d = data[n.dataset.p], c = conv(n.dataset.p, d && d.v); n.innerHTML = c.v == null ? '—' : `${fmt(c.v, n.dataset.p)}<small style="font-size:12px;color:var(--dim)"> ${esc(c.unit)}</small>`; }), 400);
+      el.querySelector('#tsCancel').onclick = () => closeSheet();
+      el.querySelector('#tsGo').onclick = () => {
+        if (timer) return;
+        const go = el.querySelector('#tsGo'); go.disabled = true;
+        const samples = {}, last = {}, t0 = Date.now();
+        watch.forEach(p => { samples[p] = []; last[p] = data[p] && data[p].hist.length ? data[p].hist.at(-1)[0] : 0; });
+        timer = setInterval(() => {
+          watch.forEach(p => { const h = data[p] && data[p].hist; if (h && h.length && h.at(-1)[0] > last[p]) { last[p] = h.at(-1)[0]; samples[p].push(h.at(-1)[1]); } });
+          const f = Math.min(1, (Date.now() - t0) / (dur * 1000));
+          $('#tsBar').style.width = (f * 100) + '%'; go.textContent = `Recording… ${Math.ceil(dur - (Date.now() - t0) / 1000)} s`;
+          if (f >= 1 || !connected) {
+            clearInterval(timer); timer = null;
+            const stats = {};
+            watch.forEach(p => { const a = samples[p]; if (a.length) stats[p] = { avg: a.reduce((x, y) => x + y, 0) / a.length, min: Math.min(...a), max: Math.max(...a), n: a.length }; });
+            if (!Object.keys(stats).length) { toast('No readings came in. Is the car supported for these sensors?'); closeSheet(); return; }
+            const m = getMod(mod.id); m.dur = dur;
+            m.log.unshift({ t: Date.now(), kind: 'test', state: label, dur: Math.round((Date.now() - t0) / 1000), stats, partial: !connected });
+            putMod(m); openCard = m.id; closeSheet(); show('mods'); setModSeg('mine');
+            toast(`Saved a ${label === 'mod' ? 'modded' : 'stock'} test. ${countTests(m, label === 'mod' ? 'stock' : 'mod') ? 'See the comparison.' : 'Now test the other way to compare.'}`, 4000);
+          }
+        }, 250);
+      };
+      const obs = new MutationObserver(() => { if (!$('#scrim').classList.contains('open')) { clearInterval(live); clearInterval(timer); timer = null; watch.forEach(p => extraPoll.delete(p)); extraPoll.delete('10'); extraPoll.delete('0D'); obs.disconnect(); } });
+      obs.observe($('#scrim'), { attributes: true });
+    });
+  }
+  const countTests = (m, st) => m.log.filter(e => e.kind === 'test' && e.state === st).length;
+  // Average every test of each state, so repeated runs smooth out noise
+  function compareHtml(m) {
+    const runs = st => m.log.filter(e => e.kind === 'test' && e.state === st);
+    const S0 = runs('stock'), S1 = runs('mod');
+    if (!S0.length && !S1.length) return '<div class="small muted" style="margin:10px 0">No tests yet. Record one stock and one modded run to compare.</div>';
+    const pids = [...new Set([...S0, ...S1].flatMap(e => Object.keys(e.stats)))];
+    const mean = (rs, p) => { const v = rs.map(e => e.stats[p]).filter(Boolean); return v.length ? v.reduce((a, s) => a + s.avg, 0) / v.length : null; };
+    const cell = (p, v) => v == null ? '—' : fmt(conv(p, v).v, p);
+    return `<div class="mmcmp"><div class="mmrow mmh"><span>Sensor</span><span>Stock${S0.length ? ' ×' + S0.length : ''}</span><span>Modded${S1.length ? ' ×' + S1.length : ''}</span><span>Change</span></div>
+      ${pids.map(p => { const a = mean(S0, p), b = mean(S1, p), ca = a == null ? null : conv(p, a).v, cb = b == null ? null : conv(p, b).v;
+        const d = ca != null && cb != null ? cb - ca : null, pct = d != null && Math.abs(ca) > 0.01 ? d / Math.abs(ca) * 100 : null;
+        return `<div class="mmrow"><span>${esc(meta(p).short)} <small>${esc(conv(p, 0).unit)}</small></span><span>${cell(p, a)}</span><span>${cell(p, b)}</span><span class="${d == null ? '' : d > 0 ? 'up' : 'down'}">${d == null ? '—' : (d > 0 ? '+' : '') + fmt(d, p) + (pct != null && Math.abs(pct) < 1000 ? ` <small>(${pct > 0 ? '+' : ''}${pct.toFixed(1)}%)</small>` : '')}</span></div>`; }).join('')}
+      </div><div class="small muted" style="margin-top:4px">Averages of every run. More runs each way = more trustworthy.</div>`;
+  }
+  function historyHtml(m) {
+    if (!m.log.length) return '';
+    const what = e => e.kind === 'test' ? `Test · ${e.state === 'mod' ? 'modded' : 'stock'} · ${e.dur} s${e.partial ? ' (cut short)' : ''}`
+      : e.kind === 'apply' ? (e.cmds ? 'Applied' : 'Marked modded') : e.kind === 'revert' ? (e.cmds ? 'Reverted' : 'Marked stock') : 'Read state';
+    return `<div class="small muted" style="margin:14px 0 4px;font-weight:600;letter-spacing:.4px">HISTORY</div>` + m.log.slice(0, 10).map(e => `<div class="mmlog"><span>${when(e.t)}</span><span>${what(e)}${e.failed ? ' <b style="color:var(--bad)">failed</b>' : ''}${e.reply ? `<code>${esc(e.reply)}</code>` : ''}</span></div>`).join('') + (m.log.length > 10 ? `<div class="small muted">+ ${m.log.length - 10} older</div>` : '');
+  }
+  function modCard(m) {
+    const [ic, tname] = MM_TYPES[m.type] || MM_TYPES.part, tests = m.log.filter(e => e.kind === 'test').length;
+    const has = a => a && a.length;
+    return `<div class="mcard ${openCard === m.id ? 'open' : ''} ${m.state === 'mod' ? 'mine' : ''}" data-id="${m.id}">
+      <div class="mhead"><div class="ic">${ic}</div><div><div class="t">${esc(m.name)}</div><div class="s"><span class="pill ${m.state === 'mod' ? 'mine' : ''}">${m.state === 'mod' ? 'Modded' : 'Stock'}</span><span class="pill">${esc(m.veh)}</span><span class="pill">${tests} test${tests === 1 ? '' : 's'}</span></div></div>
+      <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div class="mbody"><div><div class="minner">
+        ${m.note ? `<p style="margin:0 0 8px;font-size:13.5px;line-height:1.5">${esc(m.note)}</p>` : ''}
+        <div class="small muted">${esc(tname)}${has(m.apply) ? ` · apply ${m.apply.length} cmd` : ''}${has(m.revert) ? ` · revert ${m.revert.length} cmd` : ''}</div>
+        <div class="acts">
+          <button class="act" data-mm="apply" data-mid="${m.id}"><span class="an">${has(m.apply) ? 'Apply' : 'Mark modded'}</span><span class="ad">${has(m.apply) ? 'Send your apply commands' : 'You installed or changed it'}</span></button>
+          <button class="act" data-mm="revert" data-mid="${m.id}"><span class="an">${has(m.revert) ? 'Revert' : 'Mark stock'}</span><span class="ad">${has(m.revert) ? 'Send your undo commands' : 'You put it back'}</span></button>
+          <button class="act" data-mm="test" data-mid="${m.id}"><span class="an">Record a test</span><span class="ad">${(m.watch.length ? m.watch : MM_WATCH['Engine basics']).map(p => meta(p).short).join(', ')}</span></button>
+          ${has(m.read) ? `<button class="act" data-mm="read" data-mid="${m.id}"><span class="an">Read state</span><span class="ad">Check what's set now</span></button>` : ''}
+        </div>
+        ${compareHtml(m)}
+        ${historyHtml(m)}
+        <div class="row" style="margin-top:12px;gap:8px"><button class="small grow" data-mm="edit" data-mid="${m.id}">Edit</button><button class="small grow" data-mm="dup" data-mid="${m.id}">Copy to try new values</button><button class="small danger" data-mm="del" data-mid="${m.id}">Delete</button></div>
+      </div></div></div></div>`;
+  }
+  function myModsHtml(q) {
+    const all = loadMods(), here = vehLabel();
+    const list = all.filter(m => !q || JSON.stringify([m.name, m.note, m.veh]).toLowerCase().includes(q))
+      .sort((a, b) => (b.veh === here) - (a.veh === here) || (b.log[0] ? b.log[0].t : 0) - (a.log[0] ? a.log[0].t : 0));
+    if (q) return list.map(modCard).join('');
+    return `<div class="row" style="margin:8px 0 10px;gap:8px"><button class="primary grow" id="mmNew">+ New mod</button><button class="small" id="mmExport">Export</button><button class="small" id="mmImport">Import</button></div>
+      ${list.length ? list.map(modCard).join('') : `<div class="empty" style="padding:18px 10px">Save a change you make to your car: a coding change, a new part, a tune or a setting. Apply it, undo it, and record a test each way to see what it really does.</div>`}
+      <div class="note">Your commands, your responsibility: verify them for your exact vehicle first. Changes are blocked while the car is moving. Don't use this to disable emissions or safety systems, or to program keys.</div>`;
+  }
+  function editModSheet(existing) {
+    const m = existing ? JSON.parse(JSON.stringify(existing)) : { id: 'm' + Date.now(), name: '', veh: vehLabel(), type: 'coding', note: '', apply: [], revert: [], read: [], watch: MM_WATCH['Engine basics'].slice(), state: 'stock', log: [] };
+    const pids = allPidList().filter(p => meta(p).name), ta = (id, v, ph) => `<textarea id="${id}" spellcheck="false" placeholder="${ph}" style="width:100%;height:70px;background:var(--termbg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px;font:13px ui-monospace,monospace">${esc(v.join('\n'))}</textarea>`;
+    sheet(`<h3>${existing ? 'Edit mod' : 'New mod'}</h3>
+      <div class="small muted" style="margin:10px 0 4px">NAME</div><input id="mmName" style="width:100%" placeholder="e.g. Throttle response: sport map" value="${esc(m.name)}">
+      <div class="small muted" style="margin:12px 0 4px">VEHICLE</div><input id="mmVeh" style="width:100%" value="${esc(m.veh)}">
+      <div class="small muted" style="margin:12px 0 6px">TYPE</div><div class="seg" id="mmType">${Object.entries(MM_TYPES).map(([k, [i, l]]) => `<button data-v="${k}" class="${m.type === k ? 'on' : ''}">${i} ${l.split(' ')[0]}</button>`).join('')}</div>
+      <div class="small muted" style="margin:12px 0 4px">NOTES</div><input id="mmNote" style="width:100%" placeholder="what it changes, where the values came from" value="${esc(m.note)}">
+      <div class="small muted" style="margin:14px 0 4px">APPLY COMMANDS <span style="font-weight:400">(optional, one per line)</span></div>${ta('mmApply', m.apply, 'ATSH7E0\n2E....')}
+      <div class="small muted" style="margin:10px 0 4px">REVERT COMMANDS <span style="font-weight:400">(how to undo it)</span></div>${ta('mmRevert', m.revert, 'ATSH7E0\n2E....')}
+      <div class="small muted" style="margin:10px 0 4px">READ COMMANDS <span style="font-weight:400">(check the current value)</span></div>${ta('mmRead', m.read, 'ATSH7E0\n22....')}
+      <div class="small muted" style="margin:14px 0 6px">SENSORS TO TEST <span style="font-weight:400">(up to 4)</span></div>
+      <div class="chips" id="mmPre">${Object.keys(MM_WATCH).map(k => `<button class="chip small" data-k="${esc(k)}">${esc(k)}</button>`).join('')}</div>
+      <div class="chips" id="mmWatch" style="margin-top:8px">${pids.map(p => `<button class="chip small ${m.watch.includes(p) ? 'on' : ''}" data-p="${p}">${esc(meta(p).short)}</button>`).join('')}</div>
+      <div class="note">Leave the commands empty for a part or a tune you install yourself; you'll mark it modded or stock with a tap. Test new commands in the Terminal first.</div>
+      <div class="row" style="margin-top:14px"><button class="grow" id="mmCancel">Cancel</button><button class="primary grow" id="mmSave">Save</button></div>`, el => {
+      const paint = () => el.querySelectorAll('#mmWatch [data-p]').forEach(b => b.classList.toggle('on', m.watch.includes(b.dataset.p)));
+      el.querySelectorAll('#mmType button').forEach(b => b.onclick = () => { m.type = b.dataset.v; el.querySelectorAll('#mmType button').forEach(x => x.classList.toggle('on', x === b)); });
+      el.querySelectorAll('#mmPre [data-k]').forEach(b => b.onclick = () => { m.watch = MM_WATCH[b.dataset.k].slice(); paint(); });
+      el.querySelectorAll('#mmWatch [data-p]').forEach(b => b.onclick = () => {
+        const p = b.dataset.p; if (m.watch.includes(p)) m.watch = m.watch.filter(x => x !== p); else if (m.watch.length < 4) m.watch.push(p); else return toast('Up to 4 sensors');
+        paint();
+      });
+      el.querySelector('#mmCancel').onclick = closeSheet;
+      el.querySelector('#mmSave').onclick = () => {
+        m.name = el.querySelector('#mmName').value.trim() || 'Untitled mod'; m.veh = el.querySelector('#mmVeh').value.trim() || 'Any vehicle';
+        m.note = el.querySelector('#mmNote').value.trim();
+        m.apply = parseCmds(el.querySelector('#mmApply').value); m.revert = parseCmds(el.querySelector('#mmRevert').value); m.read = parseCmds(el.querySelector('#mmRead').value);
+        if (m.apply.length && !m.revert.length && !confirm('No revert commands. You will not be able to undo this from Torque Deck. Save anyway?')) return;
+        putMod(m); openCard = m.id; closeSheet(); setModSeg('mine');
+      };
+    });
+  }
+  function exportMods() {
+    const blob = new Blob([JSON.stringify({ app: 'Torque Deck', kind: 'mods', v: 1, mods: loadMods() }, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'torque-deck-mods.json'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast('Saved torque-deck-mods.json');
+  }
+  function importMods() {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+    inp.onchange = async () => {
+      try {
+        const j = JSON.parse(await inp.files[0].text()), list = Array.isArray(j) ? j : j.mods;
+        if (!Array.isArray(list)) throw new Error('not a Torque Deck mods file');
+        const all = loadMods(), ids = new Set(all.map(m => m.id)); let n = 0;
+        list.forEach(m => { if (!m || typeof m.name !== 'string') return;
+          const clean = { id: ids.has(m.id) || !m.id ? 'm' + Date.now() + n : String(m.id), name: m.name.slice(0, 80), veh: String(m.veh || 'Any vehicle').slice(0, 80), type: MM_TYPES[m.type] ? m.type : 'part', note: String(m.note || '').slice(0, 300),
+            apply: (m.apply || []).map(String).slice(0, 40), revert: (m.revert || []).map(String).slice(0, 40), read: (m.read || []).map(String).slice(0, 40),
+            watch: (m.watch || []).map(String).filter(p => meta(p).name).slice(0, 4), state: m.state === 'mod' ? 'mod' : 'stock', log: Array.isArray(m.log) ? m.log.slice(0, 200) : [] };
+          all.push(clean); ids.add(clean.id); n++; });
+        saveMods(all); renderMods(); toast(`Imported ${n} mod${n === 1 ? '' : 's'}. Check the commands before running any.`, 4000);
+      } catch (e) { toast('Import failed: ' + e.message); }
+    };
+    inp.click();
+  }
+  function setModSeg(s) { modSeg = s; $$('#modSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === s)); renderMods(); }
+  $('#modList').addEventListener('click', e => {
+    const b = e.target.closest('[data-mm]');
+    if (b) { e.stopPropagation(); modAction(b.dataset.mid, b.dataset.mm); return; }
+    if (e.target.closest('#mmNew')) editModSheet(null);
+    else if (e.target.closest('#mmExport')) exportMods();
+    else if (e.target.closest('#mmImport')) importMods();
+  }, true);
+  ACTIONS.mymods = { n: 'My mods', d: 'Save, apply, undo and test your own changes', run: () => { show('mods'); setModSeg('mine'); } };
+
+  // ---------- terminal command list ----------
+  function commandSheet() {
+    const groups = [...new Set(OBD.COMMANDS.map(c => c.g))];
+    const risk = ['', '<span class="pill">changes adapter</span>', '<span class="pill" style="color:var(--warn)">can change the car</span>'];
+    sheet(`<h3>Command list</h3><p class="small muted" style="line-height:1.5">Tap a command to put it in the terminal box. Nothing is sent until you tap Send. Commands ending in … need values you verified for your car.</p>
+      ${groups.map(g => `<div class="small muted" style="margin:14px 0 4px;font-weight:600;letter-spacing:.4px">${esc(g.toUpperCase())}</div>` + OBD.COMMANDS.filter(c => c.g === g).map(c => `<div class="opt" data-c="${esc(c.c)}"><span><b style="font-family:ui-monospace,monospace">${esc(c.c)}</b> <span class="small muted">${esc(c.d)}</span></span>${risk[c.risk]}</div>`).join('')).join('')}`, el => {
+      el.querySelectorAll('[data-c]').forEach(o => o.onclick = () => { $('#termIn').value = o.dataset.c.replace('…', ''); closeSheet(); $('#termIn').focus(); });
+    });
+  }
+
 
   // ---------- MAPS launcher (driving mode) ----------
   function mapsSheet() {
@@ -1558,7 +1789,7 @@
       <div class="hsec"><b>3 · Codes</b><p>Read stored, pending and permanent trouble codes with descriptions and freeze-frame data. "Look at them together" searches multiple codes as a set, since several at once often share one cause. Clear turns off the light (with a warning first).</p></div>
       <div class="hsec"><b>4 · Graph &amp; logging</b><p>Plot up to 3 sensors; record a drive and export a CSV.</p></div>
       <div class="hsec"><b>5 · Driving mode</b><p>Full-screen board for a phone mount — add/move/resize tiles, pick a theme, night mode. Switch to <b>Map</b> for a tilt/rotate map with your dials floating on top. <b>H↑</b> is the follow-the-car view. <b>Directions</b> draws a route; add a free TomTom key for live traffic.</p></div>
-      <div class="hsec"><b>6 · Mods &amp; My codes</b><p>Mods lists popular vehicles and accessories with in-app checks. The Terminal (at your own discretion) sends raw commands; save ones you've verified under <b>My codes</b>.</p></div>
+      <div class="hsec"><b>6 · Mods, My mods &amp; My codes</b><p><b>My mods</b> (Mods tab) saves your own changes: apply or undo them, record a test each way, and compare stock against modded. Mods also lists popular vehicles and accessories with in-app checks. The Terminal (at your own discretion) sends raw commands; save ones you've verified under <b>My codes</b>.</p></div>
       <div class="hrow"><button class="grow primary" id="helpCredits">Open-source credits &amp; licenses →</button></div>
       <div class="note" style="margin-top:12px">Provided as-is, with no warranty. You are responsible for anything you send to your vehicle. Don't use it to disable emissions or safety systems, and never operate the terminal while driving.</div>`, el => {
       el.querySelector('#helpCredits').onclick = () => { closeSheet(); setTimeout(creditsSheet, 50); };

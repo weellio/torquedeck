@@ -305,6 +305,21 @@ html.nomotion *,html.nomotion *::before{animation:none!important;transition:none
 .sheet .scan{background:var(--panel2)}
 .sheet .scan .pill{background:var(--panel)}
 .dlinks{display:flex;flex-wrap:wrap;gap:4px 16px}
+/* my mods */
+.mmcmp{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13px}
+.mmrow{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.2fr;gap:6px;padding:8px 10px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;align-items:baseline}
+.mmrow:first-child{border-top:0}
+.mmrow small{color:var(--faint);font-size:10.5px}
+.mmh{background:var(--panel2);color:var(--dim);font-size:11.5px;font-weight:600}
+.mmrow .up{color:var(--blue)}.mmrow .down{color:var(--accent2)}
+.mmlog{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:12.5px}
+.mmlog>span:first-child{color:var(--faint);white-space:nowrap}
+.mmlog code{display:block;color:var(--dim);font:11px ui-monospace,monospace;word-break:break-all;margin-top:2px}
+.chip.small{padding:5px 9px;font-size:12px;cursor:pointer}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+#modSeg button{padding:9px 2px;font-size:12.5px}
+.sheet .opt .pill{white-space:nowrap;flex:none;margin-left:8px}
+#termRef,#termInfo{white-space:nowrap}
 
 /* notched phones held sideways: keep content out of the side insets */
 header,main,nav{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -451,7 +466,7 @@ nav{padding-left:max(6px,env(safe-area-inset-left,0px));padding-right:max(6px,en
 
   <!-- MODS -->
   <section class="view" id="v-mods">
-    <div class="seg" id="modSeg"><button data-s="veh" class="on">Vehicles</button><button data-s="acc">Accessories</button><button data-s="shop">Scanners</button></div>
+    <div class="seg" id="modSeg"><button data-s="veh" class="on">Vehicles</button><button data-s="acc">Accessories</button><button data-s="mine">My mods</button><button data-s="shop">Scanners</button></div>
     <input id="modSearch" placeholder="Search vehicles, mods, accessories…" style="width:100%;margin:10px 0 4px">
     <div id="modList"></div>
     <div class="note">This app <b>reads and monitors</b>. Changing module settings needs the brand tool named on each card. Never disable emissions or safety systems. It’s illegal in most places and can fail inspection or void warranties.<br><br>Shop links go to Amazon. As an Amazon Associate, Torque Deck earns from qualifying purchases.</div>
@@ -460,7 +475,7 @@ nav{padding-left:max(6px,env(safe-area-inset-left,0px));padding-right:max(6px,en
   <!-- TERMINAL -->
   <section class="view" id="v-term">
     <div class="termbar" id="termBar"><span class="grow">⚠ Custom module header active. Live polling is paused.</span><button class="small" id="termRestore">Restore normal</button></div>
-    <div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="small muted">Raw commands · <b style="color:var(--warn)">use at your own discretion</b></span><button class="ghost small" id="termInfo">Read the warning</button></div>
+    <div class="row wrap" style="justify-content:space-between;margin-bottom:8px;gap:6px 10px"><span class="small muted grow" style="min-width:150px">Raw commands · <b style="color:var(--warn)">use at your own discretion</b></span><span class="row" style="gap:6px;flex:none"><button class="ghost small" id="termRef">Command list</button><button class="ghost small" id="termInfo">Warning</button></span></div>
     <div id="term"></div>
     <div class="quick" id="quick"></div>
     <form class="row" id="termForm"><input id="termIn" class="grow" placeholder="AT or OBD command, e.g. 010C" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="primary">Send</button></form>
