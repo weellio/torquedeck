@@ -6,7 +6,7 @@
 
   // ---------- settings ----------
   const DEF = { units: 'imp', proto: '0', red: 6500, wake: '1', speed: 'normal',
-    tiles: ['05', 'VBAT', '04', '11', '0F', 'MPG', '06', '07'], graph: ['0C', '0D', '11'], alerts: true };
+    tiles: ['05', 'VBAT', '04', '11', '0F', 'MPG', '06', '07'], graph: ['0C', '0D', '11'], alerts: true, autoRe: '1', lastConn: null };
   let S = DEF;
   try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('td.settings') || '{}')); } catch (e) { }
   const save = () => { try { localStorage.setItem('td.settings', JSON.stringify(S)); } catch (e) { } };
@@ -283,18 +283,23 @@
   // ---------- connect ----------
   function setStatus(state, text) {
     $('#dot').className = state; $('#connInfo').textContent = text;
-    $('#connBtn').textContent = state === 'on' ? 'Disconnect' : state === 'busy' ? 'Cancel' : 'Connect';
+    $('#connBtn').textContent = state === 'on' ? 'Disconnect' : state === 'busy' ? 'Cancel' : S.lastConn ? 'Reconnect' : 'Connect';
     $('#connBtn').className = state === 'on' || state === 'busy' ? '' : 'primary';
   }
   function chooseConnection() {
     const ble = OBD.BleTransport.supported(), ser = OBD.SerialTransport.supported();
     if (!ble && !ser) return compatSheet();
+    const L = S.lastConn;
     sheet(`<h3>Connect adapter</h3><p class="small muted" style="line-height:1.5">Plug the adapter into the port under the dash and turn the ignition <b>ON</b>. Not sure which type yours is? Try Bluetooth LE first. If it's not listed, pair it in your phone's Bluetooth settings (PIN is usually 1234 or 0000) and use Classic.</p>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
-        <button class="primary" id="cBle" ${ble ? '' : 'disabled'}>Bluetooth LE adapter</button>
+        ${L ? `<button class="primary" id="cRe">Reconnect ${esc(L.name)}</button>` : ''}
+        <button class="${L ? '' : 'primary'}" id="cBle" ${ble ? '' : 'disabled'}>Bluetooth LE adapter</button>
         <button id="cSer" ${ser ? '' : 'disabled'}>Bluetooth Classic (paired) / USB</button>
         <button class="ghost" id="cDemo">Demo car (no adapter)</button>
+        <button class="ghost small" id="cShop">Don't have an adapter? See which ones work</button>
       </div>${!ser ? '<p class="small muted" style="margin-top:10px">Classic Bluetooth needs Chrome 138+ on Android, or Chrome/Edge on a computer.</p>' : ''}`, el => {
+      const re = el.querySelector('#cRe'); if (re) re.onclick = () => { closeSheet(); reconnect(true); };
+      el.querySelector('#cShop').onclick = scannerSheet;
       el.querySelector('#cBle').onclick = () => { closeSheet(); connect('ble'); };
       el.querySelector('#cSer').onclick = () => { closeSheet(); connect('serial'); };
       el.querySelector('#cDemo').onclick = () => { closeSheet(); connect('demo'); };
@@ -307,12 +312,17 @@
       : 'This browser doesn’t support Web Bluetooth. Use <b>Chrome on Android</b> (or Chrome/Edge on a computer). The page must be served over HTTPS.'}</p>
       <button class="primary" style="width:100%;margin-top:10px" id="cDemo2">Explore with demo car</button>`, el => el.querySelector('#cDemo2').onclick = () => { closeSheet(); connect('demo'); });
   }
-  async function connect(kind) {
+  // opts: { device | port } reconnect without a picker · { name } one-adapter picker ·
+  //       quiet: no error sheet (background retries) · resume: keep the trip running · label: status text
+  let connecting = false, wantLive = false, retryT = null, retries = 0;
+  async function connect(kind, opts = {}) {
+    if (connecting) return false;
+    connecting = true; clearTimeout(retryT);
     try {
       transport = kind === 'demo' ? new OBD.SimTransport() : kind === 'serial' ? new OBD.SerialTransport() : new OBD.BleTransport();
       demo = kind === 'demo';
-      setStatus('busy', 'Pairing…');
-      await transport.connect();
+      setStatus('busy', opts.label || 'Pairing…');
+      await transport.connect(opts);
       transport.onDisconnect = () => lost('Adapter disconnected');
       setStatus('busy', 'Talking to ' + transport.name + '…');
       log('sys', 'Connected to ' + transport.name);
@@ -320,39 +330,88 @@
       elm.delay = SPEEDS[S.speed] || 0;
       setStatus('busy', 'Waking up the car…');
       await elm.init(S.proto);
-      connected = true;
+      connected = true; wantLive = true; retries = 0;
+      if (!demo) rememberConn(kind);
       log('sys', `${elm.version} · ${elm.protocol} · ${elm.supported.size} PIDs supported`);
       setStatus('on', `${transport.name} · ${elm.protocol}`);
       $('#welcome').style.display = 'none'; $('#dash').style.display = '';
       renderTiles(); renderAdapter(); requestWake();
-      Object.keys(data).forEach(k => delete data[k]); trip.start = 0; trip.dist = trip.fuel = trip.maxSpd = 0;
+      Object.keys(data).forEach(k => delete data[k]);
+      if (!opts.resume) { trip.start = 0; trip.dist = trip.fuel = trip.maxSpd = 0; }
       pollLoop();
       refreshStatus();
       if (!lastVin) elm.info().then(i => { lastInfo = i; lastVin = i.vin; renderInfo(); renderAdapter(); decodeNhtsa(i.vin, true); }).catch(() => { });
+      return true;
     } catch (e) {
       connected = false; setStatus('', 'Not connected');
       try { transport && transport.disconnect(); } catch (_) { }
-      if (e && (e.name === 'NotFoundError' || /cancel/i.test(e.message))) return;
+      if (opts.quiet) { log('sys', 'Reconnect failed: ' + (e && e.message)); return false; }
+      if (e && (e.name === 'NotFoundError' || /cancel/i.test(e.message))) return false;
       log('sys', 'Error: ' + (e && e.message));
       const classic = kind === 'ble' && /service|characteristic|GATT|Unsupported/i.test(e.message);
       sheet(`<h3>Couldn't connect</h3><p class="muted" style="line-height:1.5">${esc(e.message || e)}</p>
         ${classic ? '<p class="small muted" style="line-height:1.5">This adapter may be <b>Classic Bluetooth</b>. Pair it in your phone settings, then choose “Bluetooth Classic (paired)”.</p>' : ''}
         <p class="small muted" style="line-height:1.5">Checklist: ignition ON · adapter LED lit · not connected to the old app at the same time · try again.</p>
-        <button class="primary" style="width:100%;margin-top:8px" onclick="document.getElementById('scrim').classList.remove('open')">OK</button>`);
-    }
+        <div class="row" style="margin-top:8px"><button class="grow" id="errOther">Choose a different adapter</button><button class="primary grow" id="errOk">OK</button></div>`, el => {
+        el.querySelector('#errOk').onclick = closeSheet;
+        el.querySelector('#errOther').onclick = () => { closeSheet(); chooseConnection(); };
+      });
+      return false;
+    } finally { connecting = false; updateReconnectUI(); renderAdapter(); }
   }
+  // ---------- remember the adapter and reconnect to it ----------
+  const autoOn = () => S.autoRe !== '0';
+  function rememberConn(kind) {
+    const t = transport;
+    S.lastConn = { kind, name: t.name, id: (t.dev && t.dev.id) || null, info: t.port && t.port.getInfo ? Object.assign({}, t.port.getInfo()) : null };
+    save();
+  }
+  // Without a tap we can only reopen adapters the browser still remembers; with a tap we can
+  // also open the Bluetooth picker filtered to the remembered adapter.
+  async function reconnect(userTap) {
+    const L = S.lastConn; if (!L || connected || connecting) return false;
+    const T = L.kind === 'serial' ? OBD.SerialTransport : OBD.BleTransport;
+    if (!T.supported()) return false;
+    const base = { quiet: !userTap, resume: true, label: 'Reconnecting to ' + L.name + '…' };
+    const found = L.kind === 'serial' ? await T.remembered(L.info) : await T.remembered(L.id, L.name);
+    if (found) return connect(L.kind, Object.assign(base, L.kind === 'serial' ? { port: found } : { device: found }));
+    if (!userTap) return false;
+    return connect(L.kind, Object.assign(base, L.kind === 'ble' ? { name: L.name } : {}));
+  }
+  function scheduleRetry() {
+    clearTimeout(retryT);
+    if (document.hidden || retries >= 4) return;          // the visibility handler picks it up later
+    retryT = setTimeout(async () => { retries++; if (!(await reconnect(false)) && !connected) scheduleRetry(); }, [1500, 4000, 8000, 15000][retries]);
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || connected || connecting || !autoOn() || !S.lastConn || !wantLive) return;
+    retries = 0; reconnect(false).then(ok => { if (!ok && !connected) scheduleRetry(); });
+  });
+  function updateReconnectUI() {
+    const L = S.lastConn, b = $('#wReconnect');
+    if (b) { b.style.display = L && !connected ? '' : 'none'; b.textContent = L ? 'Reconnect ' + L.name : ''; }
+    $('#wConnect').classList.toggle('primary', !L);
+    $('#wConnect').textContent = L ? 'Connect a different adapter' : 'Connect adapter';
+    if (!connected && !connecting) $('#connBtn').textContent = L ? 'Reconnect' : 'Connect';
+  }
+  function forgetAdapter() { S.lastConn = null; wantLive = false; save(); updateReconnectUI(); renderAdapter(); toast('Adapter forgotten'); }
   function lost(msg) {
     if (!connected) return;
     connected = false; polling = false; setStatus('', 'Disconnected');
-    toast(msg, 4000); log('sys', msg); releaseWake();
+    log('sys', msg); releaseWake();
+    if (autoOn() && wantLive && !demo && S.lastConn) { toast(msg + '. Reconnecting…', 3000); retries = 0; scheduleRetry(); }
+    else toast(msg, 4000);
+    updateReconnectUI(); renderAdapter();
   }
   async function disconnect() {
-    polling = false; connected = false;
+    polling = false; connected = false; wantLive = false; clearTimeout(retryT);
     try { await transport.disconnect(); } catch (e) { }
-    setStatus('', 'Not connected'); log('sys', 'Disconnected'); releaseWake();
+    setStatus('', 'Not connected'); log('sys', 'Disconnected'); releaseWake(); renderAdapter();
   }
-  $('#connBtn').onclick = () => { if (connected || $('#dot').className === 'busy') disconnect(); else chooseConnection(); };
+  $('#connBtn').onclick = () => { if (connected || $('#dot').className === 'busy') disconnect(); else if (S.lastConn) reconnect(true); else chooseConnection(); };
   $('#wConnect').onclick = chooseConnection;
+  $('#wReconnect').onclick = () => reconnect(true);
+  $('#wShop').onclick = () => scannerSheet();
   $('#wDemo').onclick = () => connect('demo');
   const need = () => { if (!connected) { toast('Connect first'); return false; } return true; };
 
@@ -378,8 +437,12 @@
     try {
       lastCodes = await elm.readDtcs(); await refreshStatus();
       const all = [...lastCodes.stored.map(c => [c, 'stored']), ...lastCodes.pending.filter(c => !lastCodes.stored.includes(c)).map(c => [c, 'pending']), ...lastCodes.permanent.map(c => [c, 'permanent'])];
-      $('#dtcList').innerHTML = all.length ? all.map(([c, k]) => `<div class="dtc"><div class="code">${c}</div><div class="grow"><div><span class="tag ${k}">${k}</span></div>
-        <div style="margin:5px 0 4px">${esc(OBD.dtcDescription(c))}</div><a target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(c + ' ' + make() + ' causes fix')}">Search causes &amp; fixes ↗</a></div></div>`).join('')
+      let shopped = false;
+      $('#dtcList').innerHTML = all.length ? all.map(([c, k]) => {
+        const desc = OBD.dtcDescription(c), part = SHOP.partFor(c, desc); if (part) shopped = true;
+        return `<div class="dtc"><div class="code">${c}</div><div class="grow"><div><span class="tag ${k}">${k}</span></div>
+        <div style="margin:5px 0 4px">${esc(desc)}</div><div class="dlinks"><a target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(c + ' ' + make() + ' causes fix')}">Search causes &amp; fixes ↗</a>${part ? `<a target="_blank" rel="noopener sponsored" href="${SHOP.partUrl(part, make())}">Shop ${esc(part)} ↗</a>` : ''}</div></div></div>`;
+      }).join('') + (shopped ? `<div class="small muted" style="padding:10px 2px 0">${SHOP.DISCLOSURE}</div>` : '')
         : '<div class="empty" style="color:var(--ok)">✓ No trouble codes stored or pending.</div>';
       renderCombined([...new Set(all.map(x => x[0]))]);
       badge(); log('sys', `Codes: stored ${lastCodes.stored.join(',') || 'none'} · pending ${lastCodes.pending.join(',') || 'none'} · permanent ${lastCodes.permanent.join(',') || 'none'}`);
@@ -506,7 +569,14 @@
   }
   $('#monCard').addEventListener('click', e => { if (e.target.id === 'readMon' && need()) refreshStatus(); });
   function renderAdapter() {
-    $('#adInfo').innerHTML = !elm ? '<dt>Status</dt><dd>Not connected</dd>' : `<dt>Device</dt><dd>${esc(transport.name)}</dd><dt>Chip</dt><dd>${esc(elm.version)}</dd><dt>Protocol</dt><dd>${esc(elm.protocol)}</dd><dt>Supported PIDs</dt><dd>${elm.supported.size}</dd>`;
+    const L = S.lastConn, kindName = { ble: 'Bluetooth LE', serial: 'Classic Bluetooth / USB' };
+    $('#adInfo').innerHTML = (!elm || !connected ? '<dt>Status</dt><dd>Not connected</dd>' : `<dt>Device</dt><dd>${esc(transport.name)}</dd><dt>Chip</dt><dd>${esc(elm.version)}</dd><dt>Protocol</dt><dd>${esc(elm.protocol)}</dd><dt>Supported PIDs</dt><dd>${elm.supported.size}</dd>`)
+      + (L ? `<dt>Remembered</dt><dd>${esc(L.name)} · ${kindName[L.kind] || L.kind}</dd>` : '');
+    const b = $('#adBtns'); if (!b) return;
+    b.innerHTML = `${L && !connected ? '<button class="primary grow" id="adRe">Reconnect</button>' : ''}<button class="grow" id="adShop">Get an adapter</button>${L ? '<button class="ghost grow" id="adForget">Forget adapter</button>' : ''}`;
+    const re = $('#adRe'); if (re) re.onclick = () => reconnect(true);
+    $('#adShop').onclick = scannerSheet;
+    const fg = $('#adForget'); if (fg) fg.onclick = forgetAdapter;
   }
 
   // ---------- all sensors view (inside Car tab overlay) ----------
@@ -646,7 +716,8 @@
     // settings additions
     const set = $('#sWake').closest('.card');
     set.insertAdjacentHTML('beforeend', `<div class="row" style="justify-content:space-between;padding:6px 0"><span>Polling speed</span><select id="sSpeed"><option value="fast">Fast</option><option value="normal">Normal</option><option value="gentle">Gentle (old/cheap adapters)</option></select></div>
-      <div class="row" style="justify-content:space-between;padding:6px 0"><span>Warning alerts</span><select id="sAlerts"><option value="1">On</option><option value="0">Off</option></select></div>`);
+      <div class="row" style="justify-content:space-between;padding:6px 0"><span>Warning alerts</span><select id="sAlerts"><option value="1">On</option><option value="0">Off</option></select></div>
+      <div class="row" style="justify-content:space-between;padding:6px 0"><span>Auto-reconnect adapter</span><select id="sAutoRe"><option value="1">On</option><option value="0">Off</option></select></div>`);
     // terminal extras
     $('#v-term').insertAdjacentHTML('beforeend', '<div class="row" style="margin-top:10px"><button class="grow ghost small" id="copyLog">Copy log</button><button class="grow ghost small" id="clrLog">Clear</button></div>');
     const hb = $('#helpBtn'); if (hb) hb.onclick = helpSheet;
@@ -719,7 +790,7 @@
     const bind = (id, key, after) => { const el = $(id); el.value = S[key] === true ? '1' : S[key] === false ? '0' : S[key]; el.onchange = () => { S[key] = key === 'alerts' ? el.value === '1' : el.value; save(); after && after(); }; };
     bind('#sUnits', 'units', () => { renderTiles(); updateChips(); renderTrip(); });
     bind('#sProto', 'proto'); bind('#sRed', 'red', buildGauge); bind('#sWake', 'wake', () => S.wake === '1' ? connected && requestWake() : releaseWake());
-    bind('#sSpeed', 'speed', () => { if (elm) elm.delay = SPEEDS[S.speed]; }); bind('#sAlerts', 'alerts');
+    bind('#sSpeed', 'speed', () => { if (elm) elm.delay = SPEEDS[S.speed]; }); bind('#sAlerts', 'alerts'); bind('#sAutoRe', 'autoRe');
   }
 
   // ---------- tools used by the Mods guide ----------
@@ -845,6 +916,7 @@
         ${a.tips.map(t => `<div class="mitem"><p>${esc(t)}</p></div>`).join('')}
         <div class="small muted" style="margin:14px 0 0;font-weight:600;letter-spacing:.4px">DO IT WITH TORQUE DECK</div>${actBtns(a.actions)}
         <a class="btnlink" style="margin-top:6px" target="_blank" rel="noopener" href="${guide(veh || '', a.name, '')}">Find install guides${veh ? ' for your ' + esc(veh) : ''} ↗</a>
+        ${SHOP.accessoryUrl(a.id, veh) ? `<a class="btnlink" style="margin-top:8px" target="_blank" rel="noopener sponsored" href="${SHOP.accessoryUrl(a.id, veh)}">Shop on Amazon ↗</a>` : ''}
       </div></div></div></div>`;
   }
   function myCarCard() {
@@ -857,6 +929,18 @@
       <div class="toolbox"><b>To change settings: ${esc(T.name)}.</b> ${esc(T.note)}</div>
       <a class="btnlink" style="margin-top:8px" target="_blank" rel="noopener" href="${guide(n, 'hidden features customization', T.name)}">Find customizations for your ${esc(n)} ↗</a></div></div></div></div>`;
   }
+  // ---------- adapter picks (affiliate) ----------
+  function scannerHtml() {
+    const card = x => `<div class="scan${x.works ? '' : ' own'}"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><b>${esc(x.name)}</b>
+        <span class="row" style="gap:4px;flex:none">${x.best ? '<span class="pill mine">Best pick</span>' : ''}${x.budget ? '<span class="pill">Budget</span>' : ''}<span class="pill ${x.works ? 'both' : ''}">${esc(x.conn)}</span></span></div>
+      <p>${esc(x.what)}</p><a class="btnlink${x.works ? ' primary' : ''}" target="_blank" rel="noopener sponsored" href="${x.url}">${/\/s\?k=/.test(x.url) ? 'Search on Amazon' : 'View on Amazon'} ↗</a></div>`;
+    return `<div class="shophead">WORKS WITH TORQUE DECK</div><div class="scangrid">${SHOP.SCANNERS.filter(x => x.works).map(card).join('')}</div>
+      <div class="shophead">ALL-IN-ONE SCANNERS · USE THEIR OWN APP</div><div class="scangrid">${SHOP.SCANNERS.filter(x => !x.works).map(card).join('')}</div>
+      <p class="small muted" style="margin:12px 2px 0">${SHOP.DISCLOSURE}</p>`;
+  }
+  function scannerSheet() {
+    sheet(`<h3>Get an adapter</h3><p class="small muted" style="line-height:1.5">Any Bluetooth LE ELM327 adapter works on every phone. Classic Bluetooth ones work on Android (Chrome 138+). Plug it in under the dash, turn the ignition on, then tap Connect.</p>${scannerHtml()}`);
+  }
   function renderMods() {
     const q = $('#modSearch').value.trim().toLowerCase();
     const hay = o => JSON.stringify(o).toLowerCase();
@@ -865,6 +949,8 @@
       const vs = MODS.V.filter(v => hay([v.name, v.mods, v.rank, (MODS.TOOLS[v.tool] || {}).name]).includes(q)), as = MODS.A.filter(a => hay([a.name, a.why, a.tips]).includes(q));
       html = vs.map(v => vehCard(v, isMine(v))).join('') + as.map(accCard).join('');
       if (!html) html = '<div class="empty">Nothing matched. Try “tires”, “battery” or a model name.</div>';
+    } else if (modSeg === 'shop') {
+      html = `<p class="small muted" style="margin:6px 2px 4px;line-height:1.5">Torque Deck works with Bluetooth LE ELM327 adapters on any phone, and Classic Bluetooth ones on Android.</p>` + scannerHtml();
     } else if (modSeg === 'acc') {
       html = MODS.A.map(accCard).join('');
     } else {
@@ -1466,7 +1552,8 @@
   // ---------- HELP & CREDITS ----------
   function helpSheet() {
     sheet(`<h3>Help &amp; quick start</h3>
-      <div class="hsec"><b>1 · Connect</b><p>Plug the adapter in and turn the ignition on, then tap <b>Connect</b>. Bluetooth LE adapters connect directly; cheap Classic adapters pair in your phone's Bluetooth settings first (PIN 1234 or 0000). No adapter? Tap <b>Try demo car</b> to explore everything.</p></div>
+      <div class="hsec"><b>1 · Connect</b><p>Plug the adapter in and turn the ignition on, then tap <b>Connect</b>. Bluetooth LE adapters connect directly; cheap Classic adapters pair in your phone's Bluetooth settings first (PIN 1234 or 0000). No adapter? Tap <b>Try demo car</b> to explore everything, or see which adapters work under <b>Mods → Scanners</b>.</p></div>
+      <div class="hsec"><b>Staying connected</b><p>Torque Deck remembers your adapter. Classic Bluetooth and USB adapters reconnect on their own when you come back to the app. Bluetooth LE adapters reconnect with one tap on <b>Reconnect</b>; the list shows only your adapter. Turn this off under Car → Settings → Auto-reconnect.</p></div>
       <div class="hsec"><b>2 · Dashboard</b><p>Live gauge, speed and tiles. Tap any tile to change the sensor. Tiles turn amber/red and buzz on problems like overheating or bad battery voltage.</p></div>
       <div class="hsec"><b>3 · Codes</b><p>Read stored, pending and permanent trouble codes with descriptions and freeze-frame data. "Look at them together" searches multiple codes as a set, since several at once often share one cause. Clear turns off the light (with a warning first).</p></div>
       <div class="hsec"><b>4 · Graph &amp; logging</b><p>Plot up to 3 sensors; record a drive and export a CSV.</p></div>
@@ -1504,6 +1591,8 @@
         : '<b>Heads up:</b> this browser has no Bluetooth access. Use Chrome on Android. The demo car works anywhere.';
   }
   applyTheme(S.theme || 'torque'); injectExtras(); initSettings(); buildGauge(); renderTiles(); compatNote(); updateChips();
+  updateReconnectUI(); renderAdapter();
+  if (autoOn() && S.lastConn) reconnect(false);
   requestAnimationFrame(frame);
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
   window.__td = { connect, data, report };

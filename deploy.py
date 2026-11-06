@@ -10,7 +10,7 @@ to the absolute torquedeck_FTP_ROOT path (on these hosts it can point at a stale
 import ftplib, os, re, ssl, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FILES = ['index.html', 'app.js', 'obd.js', 'mods.js', 'sw.js', 'manifest.json',
+FILES = ['index.html', 'app.js', 'obd.js', 'mods.js', 'shop.js', 'sw.js', 'manifest.json',
          'maplibre-gl.js', 'maplibre-gl.css', 'icon-192.png', 'icon-512.png']
 HTACCESS = ('dot-htaccess.txt', '.htaccess')
 

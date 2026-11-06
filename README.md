@@ -19,6 +19,9 @@ No adapter? Tap **Try demo car** to try every screen with a simulated car.
 - **Terminal:** raw AT/OBD commands, quick buttons and a copyable log, behind a one-time "use at your own discretion" agreement.
 - **My codes:** save commands you have verified for your own vehicle and run them with one tap. Nothing comes pre-loaded. Every run goes through the same confirmation as the terminal.
 - **Themes:** 14 themes, including High Contrast Dark/Light, Colorblind Safe (Okabe-Ito), Daylight and Red Night. Text size and Reduce motion settings.
+- **Stays connected:** remembers your adapter. If the link drops it reconnects on its own. Classic Bluetooth and USB adapters also reconnect by themselves when you come back to the app. Bluetooth LE adapters take one tap on **Reconnect**, and the list shows only your adapter.
+- **Get an adapter (Mods → Scanners):** adapters that work with Torque Deck, plus popular all-in-one scanners that use their own app.
+- **Parts for the fix:** each trouble code with a known usual part (for example O2 sensor, ignition coil, gas cap) gets a **Shop** link that searches Amazon for that part for your car. Accessory cards in Mods have Shop links too.
 - **Extras:** trip computer, instant fuel economy, all-sensors view with raw hex, mirrored HUD mode for windshield reflection, screen wake lock, vibration alerts, and **Copy report** to paste into an AI chat or text to a mechanic.
 
 ## Which adapters and phones work
@@ -32,6 +35,9 @@ Tips:
 - Close the adapter's own app first. An adapter talks to one app at a time.
 - If live data is slow or drops out, set **Car → Polling speed → Gentle**.
 - To clear codes, turn the ignition ON with the engine OFF.
+
+## Affiliate links
+Shop links go to Amazon. As an Amazon Associate, Torque Deck earns from qualifying purchases. This keeps the app free. The links never change what the app shows you about your car.
 
 ## Privacy
 Everything runs on your phone. Settings, saved codes and logs stay in your browser's local
@@ -76,6 +82,7 @@ On every deploy, bump the `CACHE` version in `sw.js` so phones pick up the new b
 | `app.js` | UI logic: dashboard, codes, graph, car, mods, terminal, themes, driving mode, map |
 | `obd.js` | ELM327 engine: Bluetooth LE / Serial / demo transports, parsers, PIDs, trouble codes. Works in the browser and Node |
 | `mods.js` | Vehicle and accessory guide data |
+| `shop.js` | Adapter picks, trouble-code to part mapping, Amazon links (Associates tag) |
 | `sw.js` | Offline cache for the app files only (never intercepts map tiles) |
 | `maplibre-gl.js/.css` | Bundled MapLibre GL JS v4.7.1 (BSD-3) |
 | `manifest.json`, icons | Install as an app |

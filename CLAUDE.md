@@ -28,6 +28,10 @@ Keep it dependency-free and vanilla — do not introduce React/Vite/TypeScript/w
   - `PIDS`, `EXTRA`, `DTC_DB`, `dtcDescription()`, parsers (`parseFrames`, `decodePid`,
     `decodeDtcs`, …), and `decodeVin()`.
 - **mods.js** — `window.MODS`: `V` (vehicles), `A` (accessories), `TOOLS`, `MAKE_TOOL`.
+- **shop.js** — `window.SHOP` (also Node): Amazon Associates tag `bworld03-20`, `SCANNERS` (works:true = talks to
+  Torque Deck; BlueDriver/FIXD/V011 are own-app only, keep them labelled so), `partFor(code, desc)` rules,
+  `partUrl`, `accessoryUrl`, `DISCLOSURE`. No prices or Amazon images (Associates rules). Links use
+  `rel="noopener sponsored"`, and every view with shop links shows the disclosure once.
 - **maplibre-gl.js / maplibre-gl.css** — vendored MapLibre GL JS. **Do not edit**; replace
   wholesale to upgrade.
 - **sw.js** — service worker. Caches the app shell only. **Must stay same-origin** (it
@@ -70,6 +74,14 @@ FTPS (creds in `.env`, which is gitignored). `python deploy.py --list` is read-o
 dir IS the web root; never cwd to `torquedeck_FTP_ROOT`. Hostinger presents a `*.hstgr.io`
 cert, so deploy.py verifies the chain and that cert name instead of the hostname.
 Then hard-refresh on the phone.
+
+## Reconnect
+- `S.lastConn` = {kind, name, id, info}, saved on every real connect. `reconnect(userTap)`: Serial uses
+  `navigator.serial.getPorts()` (no picker); BLE uses `navigator.bluetooth.getDevices()` when the browser has it,
+  else (needs a tap) a picker filtered to the remembered name. Triggers: boot, link drop (retries 1.5/4/8/15 s),
+  page visible again. User Disconnect stops retries. Setting `S.autoRe`. Background attempts are `quiet` (no sheet).
+- Test with fake adapters: scratch `reconnect_test.py` pattern (fake Web Serial port + fake GATT device backed by
+  `OBD.SimTransport.respond`).
 
 ## Layout rules (mobile)
 - Driving board: 4 columns portrait, 8 landscape (same board as two halves). `fitDrive()`

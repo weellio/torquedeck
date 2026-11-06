@@ -267,11 +267,25 @@
   class BleTransport {
     constructor() { this.dev = null; this.rx = null; this.tx = null; this.onData = null; this.onDisconnect = null; this.name = ''; }
     static supported() { return typeof navigator !== 'undefined' && !!navigator.bluetooth; }
-    async connect() {
-      const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BLE_SERVICES });
+    // Devices this site was allowed before. Only some Chrome builds expose this; others return null.
+    static async remembered(id, name) {
+      try {
+        if (!navigator.bluetooth.getDevices) return null;
+        const ds = await navigator.bluetooth.getDevices();
+        return ds.find(d => id && d.id === id) || ds.find(d => name && d.name === name) || null;
+      } catch (e) { return null; }
+    }
+    // opts.device: reconnect without a picker. opts.name: picker that lists only that adapter.
+    async connect(opts = {}) {
+      let dev = opts.device;
+      if (!dev && opts.name) {
+        try { dev = await navigator.bluetooth.requestDevice({ filters: [{ name: opts.name }], optionalServices: BLE_SERVICES }); }
+        catch (e) { if (e.name !== 'NotFoundError') throw e; }
+      }
+      if (!dev) dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BLE_SERVICES });
       this.dev = dev; this.name = dev.name || 'OBD adapter';
-      dev.addEventListener('gattserverdisconnected', () => this.onDisconnect && this.onDisconnect());
-      const server = await dev.gatt.connect();
+      dev.ongattserverdisconnected = () => this.onDisconnect && this.onDisconnect();
+      const server = await this._gatt(dev, !!opts.device);
       let services = [];
       try { services = await server.getPrimaryServices(); } catch (e) { throw new Error('Connected, but no known serial service was found. This adapter may not be an OBD BLE device.'); }
       let rx = null, tx = null;
@@ -287,6 +301,21 @@
       const dec = new TextDecoder();
       rx.addEventListener('characteristicvaluechanged', ev => this.onData && this.onData(dec.decode(ev.target.value)));
       await rx.startNotifications();
+    }
+    // A remembered device may need to be heard advertising before Chrome will reconnect to it.
+    async _gatt(dev, remembered) {
+      const tryConnect = () => Promise.race([dev.gatt.connect(), new Promise((_, rej) => setTimeout(() => rej(new Error('Adapter did not answer')), 9000))]);
+      try { return await tryConnect(); }
+      catch (e) {
+        if (!remembered || !dev.watchAdvertisements) throw e;
+        await new Promise((res, rej) => {
+          const ac = new AbortController();
+          const t = setTimeout(() => { ac.abort(); rej(new Error('Adapter not in range')); }, 10000);
+          dev.addEventListener('advertisementreceived', () => { clearTimeout(t); ac.abort(); res(); }, { once: true });
+          dev.watchAdvertisements({ signal: ac.signal }).catch(err => { clearTimeout(t); rej(err); });
+        });
+        return await tryConnect();
+      }
     }
     async write(str) {
       const data = new TextEncoder().encode(str);
@@ -306,10 +335,22 @@
   class SerialTransport {
     constructor() { this.port = null; this.reader = null; this.onData = null; this.onDisconnect = null; this.name = 'Serial adapter'; this.closing = false; }
     static supported() { return typeof navigator !== 'undefined' && !!navigator.serial; }
-    async connect() {
-      let port;
-      try { port = await navigator.serial.requestPort({ allowedBluetoothServiceClassIds: [SPP_UUID] }); }
-      catch (e) { if (e.name === 'NotFoundError') throw e; port = await navigator.serial.requestPort(); }
+    // Ports this site was allowed before; Chrome reopens these without asking again.
+    static async remembered(info) {
+      try {
+        const ps = await navigator.serial.getPorts(); if (!ps.length) return null;
+        const same = p => { const i = p.getInfo ? p.getInfo() : {}; return info && ((info.bluetoothServiceClassId && i.bluetoothServiceClassId === info.bluetoothServiceClassId) || (info.usbVendorId && i.usbVendorId === info.usbVendorId && i.usbProductId === info.usbProductId)); };
+        return ps.find(same) || (ps.length === 1 ? ps[0] : null);
+      } catch (e) { return null; }
+    }
+    async connect(opts = {}) {
+      let port = opts.port;
+      if (!port) {
+        try { port = await navigator.serial.requestPort({ allowedBluetoothServiceClassIds: [SPP_UUID] }); }
+        catch (e) { if (e.name === 'NotFoundError') throw e; port = await navigator.serial.requestPort(); }
+      }
+      this.closing = false;
+      if (port.readable) { try { await port.close(); } catch (e) { } }
       this.port = port;
       const info = port.getInfo ? port.getInfo() : {};
       this.name = info.bluetoothServiceClassId ? 'Bluetooth Classic adapter' : (info.usbVendorId ? 'USB adapter' : 'Serial adapter');
@@ -337,6 +378,7 @@
     static supported() { return true; }
     async connect() { await new Promise(r => setTimeout(r, 600)); }
     async disconnect() { }
+    static async remembered() { return null; }
     state() {
       const t = (Date.now() - this.start) / 1000;
       const cyc = (Math.sin(t / 7) + 1) / 2, jitter = Math.random();
