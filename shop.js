@@ -97,7 +97,14 @@
     intake: 'cold air intake', exhaust: 'cat-back exhaust', tuner: 'performance tuner programmer', tow: 'trailer brake controller',
     remote: 'remote start', dashcam: 'hardwire dash cam', stereo: 'Apple CarPlay stereo', aero: 'roof rack', cluster: 'digital gauge cluster', hud: 'head up display' };
   const accessoryUrl = (id, vehicle) => ACCESSORY[id] ? search((vehicle ? vehicle + ' ' : '') + ACCESSORY[id]) : null;
+  // How to say the accessory in a sentence (the keyword above is tuned for Amazon search)
+  const ACC_LABEL = { battery: 'a battery', tuner: 'a tuner', remote: 'a remote starter',
+    dashcam: 'a dash cam', stereo: 'a CarPlay stereo', aero: 'a roof rack',
+    cluster: 'a digital cluster', hud: 'a head-up display', aux: 'a light bar',
+    tires: 'a leveling kit', led: 'LED bulbs', intake: 'a cold-air intake',
+    exhaust: 'a cat-back exhaust', tow: 'a brake controller' };
+  const accessoryLabel = id => ACC_LABEL[id] || ACCESSORY[id] || '';
 
-  const api = { TAG, DISCLOSURE, SCANNERS, partFor, partUrl, partLabel, accessoryUrl, search };
+  const api = { TAG, DISCLOSURE, SCANNERS, partFor, partUrl, partLabel, accessoryUrl, accessoryLabel, search };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SHOP = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -364,7 +364,9 @@ function features() {
   </section>
 
   <section id="accessories" style="padding:26px 0 10px"><h2>${MODS.A.length} accessory guides</h2>
-  ${MODS.A.map(a => `<details><summary>${a.icon} ${esc(a.name)}</summary><p>${esc(a.why)}</p><ul>${a.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></details>`).join('\n  ')}
+  ${MODS.A.map(a => { const u = SHOP.accessoryUrl(a.id, '');
+    return `<details><summary>${a.icon} ${esc(a.name)}</summary><p>${esc(a.why)}</p><ul>${a.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>${u ? `<div class="btns"><a class="btn" rel="sponsored noopener" target="_blank" href="${u}">Shop ${esc(SHOP.accessoryLabel(a.id))} on Amazon \u2197</a></div>` : ''}</details>`; }).join('\n  ')}
+  <p class="disc">Read the guide before you buy: the checks above are what decide whether the part is the right one for your car. ${esc(SHOP.DISCLOSURE)}</p>
   </section>
 
   <section id="options" style="padding:26px 0 10px"><h2>Options and settings</h2>
